@@ -471,6 +471,18 @@
     }
   }
 
+  // Only for saved data that could not be read ("broken"), after the user confirms.
+  // Removes the records key and nothing else (not the last-backup date, not the
+  // prototype key). Returns true only when the key is gone afterwards.
+  function discardSavedData(storage) {
+    try {
+      storage.removeItem(STORAGE_KEY);
+      return storage.getItem(STORAGE_KEY) === null;
+    } catch {
+      return false;
+    }
+  }
+
   function loadLastBackup(storage) {
     try {
       const value = storage.getItem(LAST_BACKUP_KEY);
@@ -549,6 +561,7 @@
     openStorage,
     loadRecords,
     saveRecords,
+    discardSavedData,
     loadLastBackup,
     saveLastBackup,
   };

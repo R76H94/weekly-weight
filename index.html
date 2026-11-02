@@ -143,7 +143,8 @@
   /* The week column gets room first, so dates are not cut into one character per line. */
   th:first-child { width: 45%; }
   tr.gap td { color: var(--muted); font-size: var(--fs-small); }
-  #more { margin-top: var(--sp-3); }
+  #more, #discard { margin-top: var(--sp-3); }
+  #discard-panel { margin-bottom: var(--sp-3); }
 
   .backup-buttons { margin-top: var(--sp-4); }
   .backup-text > * + * { margin-top: var(--sp-3); }
@@ -156,7 +157,13 @@
 
   <section aria-labelledby="h-record">
     <h2 id="h-record">記録</h2>
-    <p id="broken" class="error" role="alert" hidden>保存された記録を読み込めませんでした。記録は変更していません。バックアップがあれば読み込んでください。バックアップがない場合、この画面からは記録できません。</p>
+    <p id="broken" class="error" role="alert" hidden>保存された記録を読み込めませんでした。記録は変更していません。バックアップがあれば読み込んでください。バックアップがない場合は、保存データを消して、記録0件から始められます。消した保存データは戻せません。</p>
+    <button type="button" class="secondary" id="discard" hidden>保存データを消して、新しく始める</button>
+    <div id="discard-panel" class="panel" hidden>
+      <p>読み込めなかった保存データを消して、記録0件から始めます。消した保存データは戻せません。バックアップがあるときは、消さずに「バックアップを読み込む」を使ってください。</p>
+      <button type="button" class="primary" id="discard-yes">消して始める</button>
+      <button type="button" class="secondary" id="discard-no">やめる</button>
+    </div>
     <p id="unavailable" class="error" role="alert" hidden>このブラウザでは、記録の保存が許可されていません。ブラウザの設定で、このページのデータの保存を許可してから、開き直してください。記録は変更していません。</p>
     <form id="entry-form" novalidate>
       <div class="field">

@@ -127,5 +127,23 @@ test("the prototype storage key is not used", () => {
   for (const [name, text] of Object.entries(sources)) {
     assert.ok(!/(getItem|setItem|removeItem)\(\s*["']weekly-weight["']/.test(text), `${name} touches the old key`);
   }
-  assert.ok(!/\bremoveItem\b|\bclear\(\)/.test(sources["app.js"] + sources["core.js"]), "nothing is deleted from storage");
+  assert.ok(!/\bclear\(\)/.test(sources["app.js"] + sources["core.js"]), "storage is never cleared");
+  // The only removal is the records key, in discardSavedData (broken data, confirmed).
+  assert.ok(!/\bremoveItem\b/.test(sources["app.js"]), "app.js removes nothing directly");
+  assert.deepEqual(sources["core.js"].match(/removeItem\([^)]*\)/g), ["removeItem(STORAGE_KEY)"]);
+});
+
+test("starting over without a backup is offered only for broken data, behind a confirmation", () => {
+  const html = sources["index.html"];
+  const app = sources["app.js"];
+  assert.ok(html.includes("バックアップがない場合は、保存データを消して、記録0件から始められます。消した保存データは戻せません。"));
+  assert.ok(!html.includes("この画面からは記録できません"));
+  assert.match(html, /<button type="button" class="secondary" id="discard" hidden>保存データを消して、新しく始める<\/button>/);
+  assert.ok(html.includes("消した保存データは戻せません。バックアップがあるときは、消さずに「バックアップを読み込む」を使ってください。"));
+  assert.ok(app.includes('$("discard").hidden = !broken;'));
+  // The button only opens the panel; removing happens on "消して始める", and only while broken.
+  assert.equal(app.match(/C\.discardSavedData\(/g).length, 1);
+  const yes = app.slice(app.indexOf('$("discard-yes")'));
+  assert.ok(yes.indexOf("if (!broken || unavailable) return;") < yes.indexOf("C.discardSavedData("));
+  assert.ok(app.includes('$("discard-no").focus();'));
 });

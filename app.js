@@ -101,6 +101,9 @@
     $("unavailable").hidden = !unavailable;
     for (const id of ["kg", "date", "submit", "export"]) $(id).disabled = stopped;
     $("import").disabled = unavailable;
+    // The way to start over without a backup exists only while the saved data is broken.
+    $("discard").hidden = !broken;
+    if (!broken) $("discard-panel").hidden = true;
     // While the saved data cannot be read, no zero-record text is shown.
     for (const id of ["numbers-section", "chart-section", "history-section"]) $(id).hidden = stopped;
     // While nothing can be kept, the "kept only in this browser" text is not shown.
@@ -333,6 +336,44 @@
     renderHistory(today());
   });
 
+  // ---- starting over from broken saved data (no backup) ----
+
+  function closeDiscardPanel() {
+    $("discard-panel").hidden = true;
+  }
+
+  $("discard").addEventListener("click", () => {
+    if (!broken) return;
+    closePanel();
+    clearFormMessages();
+    $("discard-panel").hidden = false;
+    $("discard-no").focus();
+  });
+
+  $("discard-no").addEventListener("click", () => {
+    closeDiscardPanel();
+    $("done").replaceChildren(el("p", {}, "消すのをやめました。記録は変更していません。"));
+    $("discard").focus();
+  });
+
+  $("discard-yes").addEventListener("click", () => {
+    // The only removal of saved data: broken data, after the user confirmed it.
+    if (!broken || unavailable) return;
+    closeDiscardPanel();
+    clearFormMessages();
+    if (!C.discardSavedData(storage)) {
+      show($("save-error"), "保存データを消せませんでした。記録は変更していません。");
+      $("discard").focus();
+      return;
+    }
+    records = [];
+    broken = false;
+    shownRows = PAGE;
+    render();
+    $("done").replaceChildren(el("p", {}, "保存データを消しました。記録0件から始めます。"));
+    kgInput.focus();
+  });
+
   // ---- backup ----
 
   function backupStatus(text) {
@@ -394,6 +435,7 @@
       return;
     }
     pending = result.records;
+    closeDiscardPanel();
     backupStatus("");
     $("replace-text").textContent = broken
       ? `読み込めなかった保存データを、ファイルの記録 ${pending.length} 件に置き換えます。置き換えると、元の保存データは戻せません。`

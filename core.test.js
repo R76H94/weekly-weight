@@ -8,9 +8,9 @@ const core = require("./core.js");
 
 const r = (date, kg) => ({ date, kg });
 
-function fakeStorage(initial = {}, { failGet = false, failSet = false } = {}) {
+function fakeStorage(initial = {}, { failGet = false, failSet = false, failRemove = false, ignoreRemove = false } = {}) {
   const data = { ...initial };
-  const calls = { get: [], set: [] };
+  const calls = { get: [], set: [], remove: [] };
   return {
     data,
     calls,
@@ -23,6 +23,11 @@ function fakeStorage(initial = {}, { failGet = false, failSet = false } = {}) {
       calls.set.push(key);
       if (failSet) throw new Error("quota");
       data[key] = String(value);
+    },
+    removeItem(key) {
+      calls.remove.push(key);
+      if (failRemove) throw new Error("blocked");
+      if (!ignoreRemove) delete data[key];
     },
   };
 }
@@ -444,6 +449,35 @@ test("loading: broken data is reported and never written", () => {
   }
 });
 
+test("starting over from broken data removes only the records key, after confirming", () => {
+  const original = "{oops";
+  const storage = fakeStorage({
+    [KEY]: original,
+    [core.LAST_BACKUP_KEY]: "2026-10-05",
+    "weekly-weight": "prototype",
+  });
+  assert.equal(core.loadRecords(storage).state, "broken");
+  assert.deepEqual(storage.calls.remove, []); // loading never removes
+  assert.equal(core.discardSavedData(storage), true);
+  assert.deepEqual(storage.calls.remove, [KEY]);
+  assert.deepEqual(storage.calls.set, []);
+  assert.deepEqual(core.loadRecords(storage), { state: "empty", records: [] });
+  assert.equal(storage.data[core.LAST_BACKUP_KEY], "2026-10-05");
+  assert.equal(storage.data["weekly-weight"], "prototype");
+  // Recording works again from zero records.
+  assert.equal(core.saveRecords(storage, [r("2026-11-02", 62.7)]), true);
+  assert.equal(core.loadRecords(storage).state, "ok");
+});
+
+test("starting over reports failure and leaves the broken data as it was", () => {
+  for (const option of [{ failRemove: true }, { ignoreRemove: true }]) {
+    const storage = fakeStorage({ [KEY]: "{oops" }, option);
+    assert.equal(core.discardSavedData(storage), false);
+    assert.equal(storage.data[KEY], "{oops");
+    assert.equal(core.loadRecords(storage).state, "broken");
+  }
+});
+
 test("broken saved data stays byte for byte until the replacement is confirmed", () => {
   const original = '{"version":1,"records":[{"date":"2026-10-12","kg":"x"}]';
   const storage = fakeStorage({ [KEY]: original, other: "keep" });
@@ -581,6 +615,6 @@ test("last backup line: hidden and the key not read only when storage is unavail
 
   const blocked = fakeStorage(made, { failGet: true });
   assert.equal(core.lastBackupText("unavailable", blocked, TODAY), null);
-  assert.deepEqual(blocked.calls, { get: [], set: [] });
+  assert.deepEqual(blocked.calls, { get: [], set: [], remove: [] });
   assert.equal(core.lastBackupText("unavailable", null, TODAY), null);
 });
