@@ -176,3 +176,11 @@ test("the fixed-input line is shown after recording, in the quiet style", () => 
   assert.ok(app.includes('el("p", { class: "fixed" }, fixed)'));
   assert.match(sources["index.html"], /\.done \.fixed \{ color: var\(--muted\); font-size: var\(--fs-small\); \}/);
 });
+
+test("number cards choose their columns by text size and never break inside a number", () => {
+  const html = sources["index.html"];
+  // 12.5625em = 201 px at 16 px text: two cards fit from 480 px wide, never at 200% text.
+  assert.match(html, /\.cards \{ display: grid; grid-template-columns: repeat\(auto-fit, minmax\(min\(100%, 12\.5625em\), 1fr\)\);/);
+  assert.ok(!/@media \(min-width: 480px\)/.test(html), "no fixed 480 px breakpoint for the cards");
+  assert.match(html, /\.card \.value \{[^}]*overflow-wrap: normal;[^}]*\}/);
+});

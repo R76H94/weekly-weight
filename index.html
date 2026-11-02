@@ -125,11 +125,12 @@
   .done .fixed { color: var(--muted); font-size: var(--fs-small); }
   .panel p { margin-bottom: var(--sp-3); }
 
-  .cards { display: grid; grid-template-columns: 1fr; gap: var(--sp-3); }
-  @media (min-width: 480px) { .cards { grid-template-columns: 1fr 1fr; } }
+  /* Two columns only when two cards of 12.5625em fit: from 480 px wide at the standard
+     text size, and never at 200% text, where a number would break inside (design 3-4). */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12.5625em), 1fr)); gap: var(--sp-3); }
   .card { border: 1px solid var(--line); border-radius: var(--radius); padding: var(--sp-3); }
   .card .label { font-size: var(--fs-small); color: var(--muted); }
-  .card .value { font-size: var(--fs-number); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .card .value { font-size: var(--fs-number); font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: normal; }
   .card .sub { font-size: var(--fs-small); color: var(--muted); }
   .next { margin-top: var(--sp-3); }
 
