@@ -11,6 +11,7 @@
     --text: #24231f;
     --muted: #5f5c54;
     --line: #cfcbc0;
+    --field-line: #857f72;
     --accent: #2f6f62;
     --accent-text: #ffffff;
     --error: #a3481f;
@@ -41,6 +42,7 @@
       --text: #ecebe6;
       --muted: #b0aea6;
       --line: #4a4b46;
+      --field-line: #85857e;
       --accent: #7cc4b2;
       --accent-text: #14211e;
       --error: #f0a47c;
@@ -85,7 +87,7 @@
     font-size: var(--fs-base);
     color: var(--text);
     background: var(--card);
-    border: 1px solid var(--line);
+    border: 1px solid var(--field-line);
     border-radius: var(--radius);
   }
   #kg { min-height: 56px; font-size: var(--fs-input); font-variant-numeric: tabular-nums; }
@@ -104,7 +106,7 @@
   }
   button + button { margin-top: var(--sp-3); }
   .primary { background: var(--accent); color: var(--accent-text); border: 1px solid var(--accent); font-weight: 700; }
-  .secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  .secondary { background: transparent; color: var(--text); border: 1px solid var(--field-line); }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
   form .primary { margin-top: var(--sp-4); }
 
@@ -135,6 +137,7 @@
   table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
   th, td { text-align: left; padding: var(--sp-2) var(--sp-1); border-top: 1px solid var(--line); vertical-align: top; }
   th { font-size: var(--fs-small); color: var(--muted); font-weight: 400; border-top: 0; }
+  td.kg { white-space: nowrap; }
   #more { margin-top: var(--sp-3); }
 
   .backup-buttons { margin-top: var(--sp-4); }
@@ -148,6 +151,7 @@
   <section aria-labelledby="h-record">
     <h2 id="h-record">記録</h2>
     <p id="broken" class="error" role="alert" hidden>保存された記録を読み込めませんでした。記録は変更していません。バックアップがあれば読み込んでください。バックアップがない場合、この画面からは記録できません。</p>
+    <p id="unavailable" class="error" role="alert" hidden>このブラウザでは、記録の保存が許可されていません。ブラウザの設定で、このページのデータの保存を許可してから、開き直してください。記録は変更していません。</p>
     <form id="entry-form" novalidate>
       <div class="field">
         <label for="kg">体重（kg）</label>

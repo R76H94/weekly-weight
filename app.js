@@ -25,13 +25,8 @@
     DUPLICATE_WEEK: "ファイルの中に、同じ週の記録が重なっています。記録は変わっていません。",
   };
 
-  // Accessing localStorage itself can throw when the browser blocks it.
-  let storage = null;
-  try {
-    storage = window.localStorage;
-  } catch {
-    storage = null;
-  }
+  // Looking up localStorage itself can throw when the browser blocks it.
+  const storage = C.openStorage(window);
 
   // Local date as YYYY-MM-DD. Read fresh each time, the page may stay open past midnight.
   function today() {
@@ -41,9 +36,12 @@
 
   // "broken" means the saved data exists but could not be read. Nothing is written
   // to the saved key in that state until the user confirms replacing it from a file.
-  const loaded = C.loadRecords(storage, today());
+  // "unavailable" means the storage cannot be read at all. Nothing is written, and
+  // recording, saving and loading a backup are all stopped until the page is reopened.
+  const loaded = C.loadRecords(storage);
+  const unavailable = loaded.state === "unavailable";
   let broken = loaded.state === "broken";
-  let records = broken ? [] : loaded.records;
+  let records = loaded.state === "ok" || loaded.state === "empty" ? loaded.records : [];
   let shownRows = PAGE;
   let pending = null;
 
@@ -98,11 +96,14 @@
   // ---- rendering ----
 
   function renderBroken() {
+    const stopped = broken || unavailable;
     $("broken").hidden = !broken;
-    for (const id of ["kg", "date", "submit", "export"]) $(id).disabled = broken;
+    $("unavailable").hidden = !unavailable;
+    for (const id of ["kg", "date", "submit", "export"]) $(id).disabled = stopped;
+    $("import").disabled = unavailable;
     // While the saved data cannot be read, no zero-record text is shown.
-    for (const id of ["numbers-section", "chart-section", "history-section"]) $(id).hidden = broken;
-    if (broken) hide($("overwrite"));
+    for (const id of ["numbers-section", "chart-section", "history-section"]) $(id).hidden = stopped;
+    if (stopped) hide($("overwrite"));
   }
 
   function card(label, value, sub, spoken) {
@@ -230,7 +231,7 @@
         if (row.gapWeeks > 1) diff += `（${row.gapWeeks}週前との差）`;
       }
       const tr = el("tr");
-      tr.append(el("td", {}, C.formatWeekLabel(row.week, t)), el("td", {}, C.formatKg(row.kg)), el("td", {}, diff));
+      tr.append(el("td", {}, C.formatWeekLabel(row.week, t)), el("td", { class: "kg" }, C.formatKg(row.kg)), el("td", {}, diff));
       table.tBodies[0].append(tr);
     }
     target.replaceChildren(table);
@@ -248,7 +249,7 @@
     const t = today();
     dateInput.max = t;
     renderBroken();
-    if (!broken) {
+    if (!broken && !unavailable) {
       renderNumbers(t);
       renderChart(t);
       renderHistory(t);
@@ -260,7 +261,7 @@
 
   function updateOverwriteNotice() {
     const box = $("overwrite");
-    if (broken) return hide(box);
+    if (broken || unavailable) return hide(box);
     const existing = C.findSameWeek(records, dateInput.value);
     if (!existing) return hide(box);
     const range = C.formatWeekRange(C.weekOf(existing.date), today());
@@ -269,7 +270,7 @@
 
   $("entry-form").addEventListener("submit", (event) => {
     event.preventDefault();
-    if (broken) return;
+    if (broken || unavailable) return;
     clearFormMessages();
     const t = today();
     const kg = C.parseKgInput(kgInput.value);
@@ -319,7 +320,7 @@
   }
 
   $("export").addEventListener("click", () => {
-    if (broken) return;
+    if (broken || unavailable) return;
     const t = today();
     if (!records.length) {
       backupStatus("保存する記録がまだありません。");
@@ -337,7 +338,10 @@
     backupStatus(`バックアップのファイルを作りました。ファイル名：${name}。ダウンロード先にあることを確認してください。`);
   });
 
-  $("import").addEventListener("click", () => $("import-file").click());
+  $("import").addEventListener("click", () => {
+    if (unavailable) return;
+    $("import-file").click();
+  });
 
   function closePanel() {
     pending = null;
@@ -347,7 +351,7 @@
   $("import-file").addEventListener("change", async (event) => {
     const [file] = event.target.files;
     event.target.value = "";
-    if (!file) return;
+    if (!file || unavailable) return;
     closePanel();
     let text;
     if (file.size > C.MAX_BACKUP_BYTES) {
@@ -385,7 +389,7 @@
   });
 
   $("replace-yes").addEventListener("click", () => {
-    if (!pending) return;
+    if (!pending || unavailable) return;
     const next = pending;
     // The only place that writes over saved data that could not be read.
     if (!C.saveRecords(storage, next)) {

@@ -328,7 +328,7 @@ const saved = (records) => JSON.stringify({ version: 1, records });
 
 test("loading: missing key is zero records, the prototype key is not read", () => {
   const storage = fakeStorage({ "weekly-weight": '{"entries":[]}' });
-  assert.deepEqual(core.loadRecords(storage, TODAY), { state: "empty", records: [] });
+  assert.deepEqual(core.loadRecords(storage), { state: "empty", records: [] });
   assert.deepEqual(storage.calls.get, [KEY]);
   assert.deepEqual(storage.calls.set, []);
   assert.equal(KEY, "weekly-weight-v1");
@@ -336,7 +336,7 @@ test("loading: missing key is zero records, the prototype key is not read", () =
 
 test("loading: valid data", () => {
   const storage = fakeStorage({ [KEY]: saved([r("2026-10-26", 62.9), r("2026-10-12", 63.0)]) });
-  assert.deepEqual(core.loadRecords(storage, TODAY), {
+  assert.deepEqual(core.loadRecords(storage), {
     state: "ok",
     records: [r("2026-10-12", 63.0), r("2026-10-26", 62.9)],
   });
@@ -353,28 +353,96 @@ test("loading: broken data is reported and never written", () => {
   ];
   for (const text of cases) {
     const storage = fakeStorage({ [KEY]: text });
-    assert.deepEqual(core.loadRecords(storage, TODAY), { state: "broken" });
+    assert.deepEqual(core.loadRecords(storage), { state: "broken" });
     assert.equal(storage.data[KEY], text);
     assert.deepEqual(storage.calls.set, []);
   }
-  assert.deepEqual(core.loadRecords(fakeStorage({}, { failGet: true }), TODAY), { state: "broken" });
-  assert.deepEqual(core.loadRecords(null, TODAY), { state: "broken" });
 });
 
 test("broken saved data stays byte for byte until the replacement is confirmed", () => {
   const original = '{"version":1,"records":[{"date":"2026-10-12","kg":"x"}]';
   const storage = fakeStorage({ [KEY]: original, other: "keep" });
-  assert.equal(core.loadRecords(storage, TODAY).state, "broken");
+  assert.equal(core.loadRecords(storage).state, "broken");
   const file = core.parseBackup(backup({ records: [r("2026-10-12", 63.0), r("2026-10-19", 62.6)] }), TODAY);
   assert.equal(file.ok, true);
-  assert.equal(core.loadRecords(storage, TODAY).state, "broken"); // reloading before confirming
+  assert.equal(core.loadRecords(storage).state, "broken"); // reloading before confirming
   assert.equal(storage.data[KEY], original);
   assert.deepEqual(storage.calls.set, []);
   // Confirming is the only write.
   assert.equal(core.saveRecords(storage, file.records), true);
   assert.deepEqual(storage.calls.set, [KEY]);
-  assert.deepEqual(core.loadRecords(storage, TODAY), { state: "ok", records: file.records });
+  assert.deepEqual(core.loadRecords(storage), { state: "ok", records: file.records });
   assert.equal(storage.data.other, "keep");
+});
+
+test("storage that cannot be looked up or read is 'unavailable', and nothing is written", () => {
+  // Looking up window.localStorage throws.
+  const blockedWindow = {
+    get localStorage() {
+      throw new Error("SecurityError");
+    },
+  };
+  const storage = core.openStorage(blockedWindow);
+  assert.equal(storage, null);
+  assert.deepEqual(core.loadRecords(storage), { state: "unavailable" });
+  // getItem throws. The saved text is not touched and nothing is set.
+  const original = saved([r("2026-10-12", 63.0)]);
+  const failing = fakeStorage({ [KEY]: original }, { failGet: true });
+  assert.deepEqual(core.loadRecords(failing), { state: "unavailable" });
+  assert.deepEqual(failing.calls.get, [KEY]);
+  assert.deepEqual(failing.calls.set, []);
+  assert.equal(failing.data[KEY], original);
+  // A normal window gives its storage back.
+  const plain = fakeStorage();
+  assert.equal(core.openStorage({ localStorage: plain }), plain);
+});
+
+// ---- the clock went back (saved dates after today) ----
+
+// Saved on a later day; the device clock now says 2026-11-02.
+const LATER = [r("2026-10-26", 62.9), r("2026-11-09", 62.6), r("2026-11-16", 62.4)];
+
+test("clock went back: saved future dates load as normal records and recording still works", () => {
+  const original = saved(LATER);
+  const storage = fakeStorage({ [KEY]: original });
+  const loaded = core.loadRecords(storage);
+  assert.deepEqual(loaded, { state: "ok", records: LATER });
+  assert.equal(storage.data[KEY], original); // not rewritten on load
+  // Recording today is still checked against today, and works.
+  assert.equal(core.checkDate(TODAY, TODAY).ok, true);
+  assert.equal(core.checkDate("2026-11-03", TODAY).error, "FUTURE");
+  const next = core.upsertRecord(loaded.records, r(TODAY, 62.7));
+  assert.equal(core.saveRecords(storage, next), true);
+  assert.deepEqual(core.loadRecords(storage), {
+    state: "ok",
+    records: [r("2026-10-26", 62.9), r("2026-11-02", 62.7), r("2026-11-09", 62.6), r("2026-11-16", 62.4)],
+  });
+});
+
+test("clock went back: streak, differences and chart still give values", () => {
+  const records = [r("2026-10-26", 62.9), r("2026-11-02", 62.7), r("2026-11-09", 62.6), r("2026-11-16", 62.4)];
+  assert.equal(core.streak(records, TODAY), 4);
+  const summary = core.summarize(records, TODAY);
+  assert.equal(summary.count, 4);
+  assert.equal(summary.latest.week, "2026-11-16");
+  assert.equal(summary.latest.diffTenths, -2);
+  assert.equal(summary.latest.gapWeeks, 1);
+  assert.equal(summary.latest.startDiffTenths, -5);
+  assert.deepEqual(core.buildRows(records).map((row) => row.diffTenths), [null, -2, -1, -2]);
+  const model = core.chartModel(records, TODAY);
+  assert.notEqual(model, null);
+  assert.equal(model.points.length, 4);
+  assert.equal(model.xLast, "11月16日");
+  assert.equal(model.yTop, "63.7"); // 62.4〜62.9, +0.5 each side, widened to 2 kg
+  assert.equal(model.yBottom, "61.7");
+});
+
+test("clock went back: a future date in a backup file is still rejected", () => {
+  const text = backup({ records: [r("2026-10-26", 62.9), r("2026-11-09", 62.6)] });
+  assert.deepEqual(core.parseBackup(text, TODAY), { ok: false, error: "BAD_RECORD", index: 2 });
+  // The same records are fine once today is later.
+  assert.equal(core.parseBackup(text, "2026-11-09").ok, true);
+  assert.throws(() => core.parseBackup(text), TypeError);
 });
 
 test("a failed save reports failure and leaves the stored data as it was", () => {

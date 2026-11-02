@@ -309,9 +309,11 @@
     return bytes;
   }
 
-  function isValidRecord(record, today) {
+  // latestDate: the last allowed date, or null for no limit (the saved data).
+  function isValidRecord(record, latestDate) {
     if (record === null || typeof record !== "object" || Array.isArray(record)) return false;
-    if (!isRealDate(record.date) || record.date > today) return false;
+    if (!isRealDate(record.date)) return false;
+    if (latestDate !== null && record.date > latestDate) return false;
     const kg = record.kg;
     if (typeof kg !== "number" || !Number.isFinite(kg)) return false;
     if (!/^\d+(\.\d)?$/.test(String(kg))) return false;
@@ -320,12 +322,14 @@
   }
 
   // Checks a list of records the same way for backups and for the saved data.
-  function checkRecords(list, today) {
+  // Backups pass today as latestDate; the saved data passes null, so a date that
+  // became "future" after the clock went back is still a normal record.
+  function checkRecords(list, latestDate) {
     if (!Array.isArray(list) || list.length < 1 || list.length > MAX_RECORDS) {
       return { ok: false, error: "WRONG_FORMAT" };
     }
     for (let i = 0; i < list.length; i++) {
-      if (!isValidRecord(list[i], today)) return { ok: false, error: "BAD_RECORD", index: i + 1 };
+      if (!isValidRecord(list[i], latestDate)) return { ok: false, error: "BAD_RECORD", index: i + 1 };
     }
     const weeks = new Set();
     for (const record of list) {
@@ -350,18 +354,34 @@
     }
     if (data === null || typeof data !== "object" || Array.isArray(data)) return { ok: false, error: "WRONG_FORMAT" };
     if (data.app !== "weekly-weight" || data.version !== 1) return { ok: false, error: "WRONG_FORMAT" };
+    // Backups always keep the "today or earlier" check.
+    if (!isRealDate(today)) throw new TypeError("parseBackup needs today as YYYY-MM-DD");
     return checkRecords(data.records, today);
+  }
+
+  // Returns window.localStorage, or null when even looking it up throws
+  // (the browser does not allow this page to store data).
+  function openStorage(win) {
+    try {
+      return win.localStorage ?? null;
+    } catch {
+      return null;
+    }
   }
 
   // Reads the saved records. Never writes.
   // { state: "empty", records: [] } when the key is missing,
-  // { state: "ok", records } when valid, { state: "broken" } otherwise.
-  function loadRecords(storage, today) {
+  // { state: "ok", records } when valid,
+  // { state: "unavailable" } when the storage cannot be looked up or read,
+  // { state: "broken" } when the saved data is there but does not pass the checks.
+  // Dates after today are not checked here (see checkRecords).
+  function loadRecords(storage) {
+    if (!storage) return { state: "unavailable" };
     let text;
     try {
       text = storage.getItem(STORAGE_KEY);
     } catch {
-      return { state: "broken" };
+      return { state: "unavailable" };
     }
     if (text === null || text === undefined) return { state: "empty", records: [] };
     let data;
@@ -373,7 +393,7 @@
     if (data === null || typeof data !== "object" || Array.isArray(data) || data.version !== 1) {
       return { state: "broken" };
     }
-    const checked = checkRecords(data.records, today);
+    const checked = checkRecords(data.records, null);
     return checked.ok ? { state: "ok", records: checked.records } : { state: "broken" };
   }
 
@@ -432,6 +452,7 @@
     buildBackup,
     backupFileName,
     parseBackup,
+    openStorage,
     loadRecords,
     saveRecords,
     loadLastBackup,
