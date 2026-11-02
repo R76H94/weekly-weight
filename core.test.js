@@ -465,3 +465,20 @@ test("the last backup date is kept apart from the records", () => {
   assert.equal(core.saveLastBackup(fakeStorage({}, { failSet: true }), TODAY), false);
   assert.equal(core.loadLastBackup(null), null);
 });
+
+test("last backup line: hidden and the key not read only when storage is unavailable", () => {
+  const made = { [core.LAST_BACKUP_KEY]: "2026-10-26" };
+  for (const state of ["empty", "ok", "broken"]) {
+    assert.equal(core.lastBackupText(state, fakeStorage(made), TODAY), "最後にバックアップを作った日：10月26日");
+    assert.equal(core.lastBackupText(state, fakeStorage(), TODAY), "バックアップはまだ作っていません。");
+  }
+  assert.equal(
+    core.lastBackupText("ok", fakeStorage({ [core.LAST_BACKUP_KEY]: "2025-12-29" }), TODAY),
+    "最後にバックアップを作った日：2025年12月29日",
+  );
+
+  const blocked = fakeStorage(made, { failGet: true });
+  assert.equal(core.lastBackupText("unavailable", blocked, TODAY), null);
+  assert.deepEqual(blocked.calls, { get: [], set: [] });
+  assert.equal(core.lastBackupText("unavailable", null, TODAY), null);
+});

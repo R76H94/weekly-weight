@@ -239,10 +239,10 @@
   }
 
   function renderLastBackup(t) {
-    const date = C.loadLastBackup(storage);
-    $("last-backup").textContent = date
-      ? `最後にバックアップを作った日：${C.formatDate(date, t)}`
-      : "バックアップはまだ作っていません。";
+    // While the storage is unavailable, no line is shown and the key is not read.
+    const text = C.lastBackupText(loaded.state, storage, t);
+    if (text === null) hide($("last-backup"));
+    else show($("last-backup"), text);
   }
 
   function render() {

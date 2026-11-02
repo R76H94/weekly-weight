@@ -428,10 +428,19 @@
     }
   }
 
+  // The line under the backup buttons. Returns null (no line) when the storage is
+  // "unavailable"; in that state the last-backup key is not read at all.
+  function lastBackupText(loadState, storage, today) {
+    if (loadState === "unavailable") return null;
+    const date = loadLastBackup(storage);
+    return date ? `最後にバックアップを作った日：${formatDate(date, today)}` : "バックアップはまだ作っていません。";
+  }
+
   return {
     STORAGE_KEY,
     LAST_BACKUP_KEY,
     MAX_BACKUP_BYTES,
+    lastBackupText,
     weekOf,
     isRealDate,
     parseKgInput,
