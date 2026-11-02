@@ -128,7 +128,7 @@
     const cards = [card("最新の体重", C.formatKg(latest.kg), C.formatWeekLabelWithDay(latest.week, t))];
 
     if (latest.diffTenths === null) {
-      cards.push(card("前回との差", "—", "比べる記録がまだありません"));
+      cards.push(card("前回との差", "—", C.ONE_RECORD_NOTE));
     } else {
       const label = latest.gapWeeks > 1 ? `前回との差（${latest.gapWeeks}週前）` : "前回との差";
       cards.push(
@@ -142,7 +142,7 @@
     }
 
     if (latest.startDiffTenths === null) {
-      cards.push(card("開始からの差", "—", "次の週から表示します"));
+      cards.push(card("開始からの差", "—", C.ONE_RECORD_NOTE));
     } else {
       cards.push(
         card(
@@ -159,7 +159,7 @@
 
     const grid = el("div", { class: "cards" });
     grid.append(...cards);
-    target.replaceChildren(grid);
+    target.replaceChildren(grid, el("p", { class: "next" }, C.nextRecordText(records, t)));
   }
 
   function renderChart(t) {

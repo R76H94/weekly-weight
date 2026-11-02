@@ -142,6 +142,17 @@
     };
   }
 
+  // The week to record next: the later of this week and the week after the latest
+  // record. null when there are no records. No reminder is sent anywhere; this is
+  // only a line on the screen.
+  function nextRecordWeek(records, today) {
+    if (!records.length) return null;
+    const latest = records.map((record) => weekOf(record.date)).sort().pop();
+    const afterLatest = addWeeks(latest, 1);
+    const thisWeek = weekOf(today);
+    return afterLatest > thisWeek ? afterLatest : thisWeek;
+  }
+
   // ---- formatting ----
 
   function yearOf(date) {
@@ -184,6 +195,16 @@
     else endText = `${Number(end.slice(8, 10))}日`;
     return `${start}〜${endText}`;
   }
+
+  function nextRecordText(records, today) {
+    const week = nextRecordWeek(records, today);
+    if (week === null) return null;
+    const thisWeek = week === weekOf(today) ? "（今週）" : "";
+    return `次の記録は、${formatWeekLabelWithDay(week, today)}${thisWeek}です。`;
+  }
+
+  // Shown under "—" while there is only one record.
+  const ONE_RECORD_NOTE = "次の週にもう1回記録すると、差が出ます";
 
   function formatKg(kg) {
     return `${(toTenths(kg) / 10).toFixed(1)} kg`;
@@ -451,6 +472,9 @@
     MAX_BACKUP_BYTES,
     lastBackupText,
     showsStorageExplanation,
+    nextRecordWeek,
+    nextRecordText,
+    ONE_RECORD_NOTE,
     weekOf,
     isRealDate,
     parseKgInput,

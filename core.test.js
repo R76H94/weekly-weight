@@ -194,6 +194,27 @@ test("summary gives what the cards need", () => {
   assert.equal(many.start.week, "2026-10-12");
 });
 
+test("next record week: this week until it is recorded, then the week after", () => {
+  assert.equal(core.nextRecordWeek([], "2026-11-04"), null);
+  assert.equal(core.nextRecordText([], "2026-11-04"), null);
+  const lastWeek = [r("2026-10-26", 62.9)];
+  assert.equal(core.nextRecordWeek(lastWeek, "2026-11-04"), "2026-11-02");
+  assert.equal(core.nextRecordText(lastWeek, "2026-11-04"), "次の記録は、11月2日（月）から始まる週（今週）です。");
+  const thisWeek = [r("2026-10-26", 62.9), r("2026-11-04", 62.7)];
+  assert.equal(core.nextRecordWeek(thisWeek, "2026-11-04"), "2026-11-09");
+  assert.equal(core.nextRecordText(thisWeek, "2026-11-08"), "次の記録は、11月9日（月）から始まる週です。");
+  // A long gap: this week, not the week after the old record.
+  assert.equal(core.nextRecordWeek([r("2026-09-07", 63.1)], "2026-11-04"), "2026-11-02");
+  // Across the new year, the year is written by the Monday's year.
+  assert.equal(core.nextRecordText([r("2026-12-30", 62.4)], "2026-12-31"), "次の記録は、2027年1月4日（月）から始まる週です。");
+  // Saved dates after today (clock went back): the week after the latest record.
+  assert.equal(core.nextRecordWeek([r("2026-11-10", 62.4)], "2026-11-04"), "2026-11-16");
+});
+
+test("one record: the dash is explained as 'record once more next week'", () => {
+  assert.equal(core.ONE_RECORD_NOTE, "次の週にもう1回記録すると、差が出ます");
+});
+
 // ---- year display ----
 
 test("the year is written only when it is not this year", () => {
