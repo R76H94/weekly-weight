@@ -456,7 +456,16 @@
   function lastBackupText(loadState, storage, today) {
     if (loadState === "unavailable") return null;
     const date = loadLastBackup(storage);
-    return date ? `最後にバックアップを作った日：${formatDate(date, today)}` : "バックアップはまだ作っていません。";
+    return date ? `最後にバックアップを作った日：${formatDate(date, today)}` : "バックアップを作ると、ここに作った日が出ます。";
+  }
+
+  // Shown after "バックアップを保存". The page cannot see where the browser put it,
+  // so it says where it usually is.
+  function backupDoneText(fileName) {
+    return (
+      `バックアップを作りました（${fileName}）。` +
+      "ふつうは、スマホでは「ファイル」アプリの「ダウンロード」、パソコンでは「ダウンロード」フォルダに入ります。"
+    );
   }
 
   // Whether to show the text saying the records are kept only in this browser.
@@ -471,6 +480,7 @@
     LAST_BACKUP_KEY,
     MAX_BACKUP_BYTES,
     lastBackupText,
+    backupDoneText,
     showsStorageExplanation,
     nextRecordWeek,
     nextRecordText,

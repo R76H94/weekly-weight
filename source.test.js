@@ -82,6 +82,29 @@ test("only the 'kept in this browser' text is marked to hide when storage is una
   assert.ok(sources["app.js"].includes("[data-storage-explanation]"));
 });
 
+test("the backup section says what the plan requires, in plain words", () => {
+  const text = sources["index.html"].replace(/<[^>]+>/g, "").replace(/\s+/g, "");
+  // Plan: kept only in this browser, when it is lost, a backup is advised, nothing is sent out.
+  for (const part of [
+    "記録は、この端末のブラウザの中だけに保存されます。",
+    "ブラウザのデータを消したとき、端末の故障や買い替え、別のブラウザで開いたときは、記録が消えるか、見られなくなります。",
+    "バックアップをしなくても、毎週の記録はできます。",
+    "機種変更や別の端末で見るときのために、月に1回ほどバックアップを保存してください。",
+    "端末を移すとき：",
+    "今の端末で「バックアップを保存」",
+    "できたバックアップを、メールなどで新しい端末へ",
+    "新しい端末で「バックアップを読み込む」",
+    "入力した体重や日付は、外部へ送信しません。",
+  ]) {
+    assert.ok(text.includes(part), part);
+  }
+  const start = text.indexOf("バックアップと保存について");
+  const end = text.indexOf("バックアップを保存バックアップを読み込む", start);
+  assert.ok(start >= 0 && end > start);
+  const body = text.slice(start, end);
+  for (const word of ["ファイル", "ダウンロード", "json", "JSON"]) assert.ok(!body.includes(word), word);
+});
+
 test("the prototype storage key is not used", () => {
   for (const [name, text] of Object.entries(sources)) {
     assert.ok(!/(getItem|setItem|removeItem)\(\s*["']weekly-weight["']/.test(text), `${name} touches the old key`);

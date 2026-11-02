@@ -517,6 +517,15 @@ test("the last backup date is kept apart from the records", () => {
   assert.equal(core.loadLastBackup(null), null);
 });
 
+test("backup texts say where the backup goes and do not blame", () => {
+  assert.equal(
+    core.backupDoneText(core.backupFileName("2026-11-02")),
+    "バックアップを作りました（weekly-weight-2026-11-02.json）。ふつうは、スマホでは「ファイル」アプリの「ダウンロード」、パソコンでは「ダウンロード」フォルダに入ります。",
+  );
+  const none = core.lastBackupText("empty", fakeStorage(), TODAY);
+  assert.ok(!/まだ|ません/.test(none), none);
+});
+
 test("the 'kept only in this browser' text is shown in every state but unavailable", () => {
   for (const state of ["empty", "ok", "broken"]) assert.equal(core.showsStorageExplanation(state), true);
   assert.equal(core.showsStorageExplanation("unavailable"), false);
@@ -529,7 +538,7 @@ test("last backup line: hidden and the key not read only when storage is unavail
   const made = { [core.LAST_BACKUP_KEY]: "2026-10-26" };
   for (const state of ["empty", "ok", "broken"]) {
     assert.equal(core.lastBackupText(state, fakeStorage(made), TODAY), "最後にバックアップを作った日：10月26日");
-    assert.equal(core.lastBackupText(state, fakeStorage(), TODAY), "バックアップはまだ作っていません。");
+    assert.equal(core.lastBackupText(state, fakeStorage(), TODAY), "バックアップを作ると、ここに作った日が出ます。");
   }
   assert.equal(
     core.lastBackupText("ok", fakeStorage({ [core.LAST_BACKUP_KEY]: "2025-12-29" }), TODAY),

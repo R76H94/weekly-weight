@@ -338,7 +338,7 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     // A failure to remember the date does not make the backup fail.
     if (C.saveLastBackup(storage, t)) renderLastBackup(t);
-    backupStatus(`バックアップのファイルを作りました。ファイル名：${name}。ダウンロード先にあることを確認してください。`);
+    backupStatus(C.backupDoneText(name));
   });
 
   $("import").addEventListener("click", () => {

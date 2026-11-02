@@ -142,7 +142,8 @@
   #more { margin-top: var(--sp-3); }
 
   .backup-buttons { margin-top: var(--sp-4); }
-  .backup-text p + p { margin-top: var(--sp-3); }
+  .backup-text > * + * { margin-top: var(--sp-3); }
+  .steps { margin: 0; padding-left: 1.5em; }
 </style>
 </head>
 <body>
@@ -193,8 +194,16 @@
   <section aria-labelledby="h-backup">
     <h2 id="h-backup">バックアップと保存について</h2>
     <div class="backup-text">
-      <p data-storage-explanation>記録は、この端末のブラウザの中だけに保存されています。ブラウザのデータを消したとき、端末が壊れたり買い替えたりしたとき、別のブラウザや別の端末で開いたときは、記録が消える、または見られなくなります。</p>
-      <p data-storage-explanation>消えないように、ときどきバックアップを保存してください。保存したファイルは、あなたの端末に残ります。</p>
+      <p data-storage-explanation>記録は、この端末のブラウザの中だけに保存されます。ブラウザのデータを消したとき、端末の故障や買い替え、別のブラウザで開いたときは、記録が消えるか、見られなくなります。</p>
+      <p data-storage-explanation>バックアップをしなくても、毎週の記録はできます。機種変更や別の端末で見るときのために、月に1回ほどバックアップを保存してください。</p>
+      <div data-storage-explanation>
+        <p>端末を移すとき：</p>
+        <ol class="steps">
+          <li>今の端末で「バックアップを保存」</li>
+          <li>できたバックアップを、メールなどで新しい端末へ</li>
+          <li>新しい端末で「バックアップを読み込む」</li>
+        </ol>
+      </div>
       <p>入力した体重や日付は、外部へ送信しません。</p>
     </div>
     <div class="backup-buttons">
