@@ -436,11 +436,19 @@
     return date ? `最後にバックアップを作った日：${formatDate(date, today)}` : "バックアップはまだ作っていません。";
   }
 
+  // Whether to show the text saying the records are kept only in this browser.
+  // In the "unavailable" state nothing can be kept, so that text is not shown;
+  // only the sentences saying nothing is sent out stay.
+  function showsStorageExplanation(loadState) {
+    return loadState !== "unavailable";
+  }
+
   return {
     STORAGE_KEY,
     LAST_BACKUP_KEY,
     MAX_BACKUP_BYTES,
     lastBackupText,
+    showsStorageExplanation,
     weekOf,
     isRealDate,
     parseKgInput,

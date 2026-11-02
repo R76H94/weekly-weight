@@ -103,6 +103,9 @@
     $("import").disabled = unavailable;
     // While the saved data cannot be read, no zero-record text is shown.
     for (const id of ["numbers-section", "chart-section", "history-section"]) $(id).hidden = stopped;
+    // While nothing can be kept, the "kept only in this browser" text is not shown.
+    const explain = C.showsStorageExplanation(loaded.state);
+    for (const node of document.querySelectorAll("[data-storage-explanation]")) node.hidden = !explain;
     if (stopped) hide($("overwrite"));
   }
 

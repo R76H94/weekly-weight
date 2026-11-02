@@ -60,6 +60,28 @@ test("no browser confirm dialog and no external scripts", () => {
   assert.ok(!/<link\b[^>]*\bhref\s*=\s*["']?(https?:)?\/\//i.test(sources["index.html"]), "external stylesheet");
 });
 
+// Design 2 "保存できないとき": these parts are hidden when storage is unavailable.
+function storageExplanationParts(html) {
+  return [...html.matchAll(/<(\w+)\b[^>]*\bdata-storage-explanation\b[^>]*>([\s\S]*?)<\/\1>/g)].map((m) =>
+    m[2].replace(/<[^>]+>/g, "").replace(/\s+/g, ""),
+  );
+}
+
+test("only the 'kept in this browser' text is marked to hide when storage is unavailable", () => {
+  const html = sources["index.html"];
+  const parts = storageExplanationParts(html);
+  assert.ok(parts.length >= 2, "the record note and the backup text are marked");
+  assert.ok(parts[0].startsWith("記録はこの端末のブラウザの中だけに保存されます。"), "record note is marked");
+  assert.ok(parts.some((text) => text.startsWith("記録は、この端末のブラウザの中だけに保存")), "backup text is marked");
+  for (const text of parts) assert.ok(!text.includes("外部へ送信しません"), "the 'not sent out' text stays");
+  // The two "not sent out" sentences and the two backup buttons are not inside a marked part.
+  const unmarked = html.replace(/<(\w+)\b[^>]*\bdata-storage-explanation\b[^>]*>[\s\S]*?<\/\1>/g, "");
+  assert.ok(unmarked.includes("入力した内容は外部へ送信しません。"));
+  assert.ok(unmarked.includes("<p>入力した体重や日付は、外部へ送信しません。</p>"));
+  assert.ok(unmarked.includes('id="export"') && unmarked.includes('id="import"'));
+  assert.ok(sources["app.js"].includes("[data-storage-explanation]"));
+});
+
 test("the prototype storage key is not used", () => {
   for (const [name, text] of Object.entries(sources)) {
     assert.ok(!/(getItem|setItem|removeItem)\(\s*["']weekly-weight["']/.test(text), `${name} touches the old key`);

@@ -488,6 +488,14 @@ test("the last backup date is kept apart from the records", () => {
   assert.equal(core.loadLastBackup(null), null);
 });
 
+test("the 'kept only in this browser' text is shown in every state but unavailable", () => {
+  for (const state of ["empty", "ok", "broken"]) assert.equal(core.showsStorageExplanation(state), true);
+  assert.equal(core.showsStorageExplanation("unavailable"), false);
+  // Both ways of being unavailable lead there.
+  assert.equal(core.showsStorageExplanation(core.loadRecords(core.openStorage({ get localStorage() { throw new Error("blocked"); } })).state), false);
+  assert.equal(core.showsStorageExplanation(core.loadRecords(fakeStorage({}, { failGet: true })).state), false);
+});
+
 test("last backup line: hidden and the key not read only when storage is unavailable", () => {
   const made = { [core.LAST_BACKUP_KEY]: "2026-10-26" };
   for (const state of ["empty", "ok", "broken"]) {
