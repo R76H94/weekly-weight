@@ -91,6 +91,27 @@ test("weight input is normalized and checked in order", () => {
   assert.equal(core.parseKgInput("-62").error, "RANGE");
 });
 
+test("a fixed input is told in one line; plain input is not", () => {
+  const cases = [
+    ["62,9", "入力の「62,9」は 62.9 として記録しました。"],
+    ["６２．９", "入力の「６２．９」は 62.9 として記録しました。"],
+    ["６２", "入力の「６２」は 62.0 として記録しました。"],
+    ["62，9", "入力の「62，9」は 62.9 として記録しました。"],
+    ["6 2.9", "入力の「6 2.9」は 62.9 として記録しました。"],
+    [" 62,9 ", "入力の「62,9」は 62.9 として記録しました。"],
+  ];
+  for (const [text, expected] of cases) {
+    const kg = core.parseKgInput(text);
+    assert.equal(kg.ok, true, text);
+    assert.equal(core.inputCorrectionText(text, kg.kg), expected);
+  }
+  for (const text of ["62.9", "62", " 62.9 ", "62.0", "　62.9"]) {
+    const kg = core.parseKgInput(text);
+    assert.equal(kg.ok, true, text);
+    assert.equal(core.inputCorrectionText(text, kg.kg), null, text);
+  }
+});
+
 test("dates must be present and not in the future", () => {
   assert.equal(core.checkDate("", "2026-11-02").error, "EMPTY");
   assert.equal(core.checkDate("2026-02-30", "2026-11-02").error, "EMPTY");

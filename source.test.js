@@ -160,3 +160,10 @@ test("the 'cannot store' message gives a hint without naming a device, still thr
   assert.equal(match[1].split("。").filter(Boolean).length, 3);
   for (const word of ["iPhone", "Android", "Safari", "Chrome"]) assert.ok(!match[1].includes(word), word);
 });
+
+test("the fixed-input line is shown after recording, in the quiet style", () => {
+  const app = sources["app.js"];
+  assert.ok(app.includes("const fixed = C.inputCorrectionText(typed, kg.kg);"));
+  assert.ok(app.includes('el("p", { class: "fixed" }, fixed)'));
+  assert.match(sources["index.html"], /\.done \.fixed \{ color: var\(--muted\); font-size: var\(--fs-small\); \}/);
+});

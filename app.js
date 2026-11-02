@@ -296,7 +296,8 @@
     if (broken || unavailable) return;
     clearFormMessages();
     const t = today();
-    const kg = C.parseKgInput(kgInput.value);
+    const typed = kgInput.value;
+    const kg = C.parseKgInput(typed);
     const date = dateInput.value;
     const dateCheck = C.checkDate(date, t);
     if (!kg.ok) setFieldError(kgInput, $("kg-error"), KG_MESSAGES[kg.error]);
@@ -322,7 +323,11 @@
     const count = C.streak(records, t);
     lines.push(count === null ? "記録しました。" : `記録しました。連続 ${count} 週です。`);
     lines.push(`${C.formatKg(kg.kg)}（${C.formatDate(date, t)}）`);
-    $("done").replaceChildren(...lines.map((line) => el("p", {}, line)));
+    const nodes = lines.map((line) => el("p", {}, line));
+    // Says quietly that "62,9" or full-width digits were read as 62.9 (design 3-3).
+    const fixed = C.inputCorrectionText(typed, kg.kg);
+    if (fixed) nodes.push(el("p", { class: "fixed" }, fixed));
+    $("done").replaceChildren(...nodes);
   });
 
   for (const input of [kgInput, dateInput]) {

@@ -71,6 +71,15 @@
     return { ok: true, kg: tenths / 10 };
   }
 
+  // One quiet line after recording, when the input had to be fixed to be read
+  // (full-width digits, a comma, spaces inside...). null for plain input like
+  // "62.9" or "62"; writing 62 as 62.0 is not a fix.
+  function inputCorrectionText(text, kg) {
+    const raw = String(text ?? "").trim();
+    if (/^\d+(\.\d)?$/.test(raw)) return null;
+    return `入力の「${raw}」は ${formatKgNumber(kg)} として記録しました。`;
+  }
+
   function checkDate(date, today) {
     if (!date || !isRealDate(date)) return { ok: false, error: "EMPTY" };
     if (date > today) return { ok: false, error: "FUTURE" };
@@ -538,6 +547,7 @@
     weekOf,
     isRealDate,
     parseKgInput,
+    inputCorrectionText,
     checkDate,
     findSameWeek,
     upsertRecord,
