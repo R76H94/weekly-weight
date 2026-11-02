@@ -105,6 +105,15 @@ test("the backup section says what the plan requires, in plain words", () => {
   for (const word of ["ファイル", "ダウンロード", "json", "JSON"]) assert.ok(!body.includes(word), word);
 });
 
+test("history numbers do not wrap and the unit is in the header", () => {
+  const html = sources["index.html"];
+  assert.match(html, /td\.num, td \.num, th \.num \{ white-space: nowrap; overflow-wrap: normal; \}/);
+  const app = sources["app.js"];
+  assert.ok(app.includes('["体重", "（kg）"], ["前回との差", "（kg）"]'));
+  assert.ok(app.includes('el("td", { class: "num" }, C.formatKgNumber(row.kg))'));
+  assert.ok(app.includes('el("span", { class: "num" }, C.formatDiff(row.diffTenths))'));
+});
+
 test("the prototype storage key is not used", () => {
   for (const [name, text] of Object.entries(sources)) {
     assert.ok(!/(getItem|setItem|removeItem)\(\s*["']weekly-weight["']/.test(text), `${name} touches the old key`);

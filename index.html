@@ -138,7 +138,10 @@
   table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
   th, td { text-align: left; padding: var(--sp-2) var(--sp-1); border-top: 1px solid var(--line); vertical-align: top; }
   th { font-size: var(--fs-small); color: var(--muted); font-weight: 400; border-top: 0; }
-  td.kg { white-space: nowrap; }
+  /* Numbers never break, not even inside "64.8" (overflow-wrap: anywhere is on body). */
+  td.num, td .num, th .num { white-space: nowrap; overflow-wrap: normal; }
+  /* The week column gets room first, so dates are not cut into one character per line. */
+  th:first-child { width: 45%; }
   #more { margin-top: var(--sp-3); }
 
   .backup-buttons { margin-top: var(--sp-4); }

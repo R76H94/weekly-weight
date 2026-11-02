@@ -206,8 +206,13 @@
   // Shown under "—" while there is only one record.
   const ONE_RECORD_NOTE = "次の週にもう1回記録すると、差が出ます";
 
+  // The number only, for the history table where the unit is in the header.
+  function formatKgNumber(kg) {
+    return (toTenths(kg) / 10).toFixed(1);
+  }
+
   function formatKg(kg) {
-    return `${(toTenths(kg) / 10).toFixed(1)} kg`;
+    return `${formatKgNumber(kg)} kg`;
   }
 
   function formatDiff(tenths) {
@@ -499,6 +504,7 @@
     formatWeekLabelWithDay,
     formatWeekRange,
     formatKg,
+    formatKgNumber,
     formatDiff,
     spokenDiff,
     chartModel,

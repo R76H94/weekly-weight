@@ -224,17 +224,27 @@
     }
     const table = el("table");
     const head = el("tr");
-    for (const name of ["週", "体重", "前回との差"]) head.append(el("th", { scope: "col" }, name));
+    // The unit is in the header, so a number never wraps away from "kg" (design 3-6).
+    for (const [name, unit] of [["週", ""], ["体重", "（kg）"], ["前回との差", "（kg）"]]) {
+      const th = el("th", { scope: "col" }, name);
+      if (unit) th.append(el("span", { class: "num" }, unit));
+      head.append(th);
+    }
     table.append(el("thead"), el("tbody"));
     table.tHead.append(head);
     for (const row of rows.slice(0, shownRows)) {
-      let diff = "—";
-      if (row.diffTenths !== null) {
-        diff = `${C.formatDiff(row.diffTenths)} kg`;
-        if (row.gapWeeks > 1) diff += `（${row.gapWeeks}週前との差）`;
+      const diff = el("td");
+      if (row.diffTenths === null) diff.textContent = "—";
+      else {
+        diff.append(el("span", { class: "num" }, C.formatDiff(row.diffTenths)));
+        if (row.gapWeeks > 1) diff.append(`（${row.gapWeeks}週前との差）`);
       }
       const tr = el("tr");
-      tr.append(el("td", {}, C.formatWeekRange(row.week, t)), el("td", { class: "kg" }, C.formatKg(row.kg)), el("td", {}, diff));
+      tr.append(
+        el("td", {}, C.formatWeekRange(row.week, t)),
+        el("td", { class: "num" }, C.formatKgNumber(row.kg)),
+        diff,
+      );
       table.tBodies[0].append(tr);
     }
     target.replaceChildren(table);

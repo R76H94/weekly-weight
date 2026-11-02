@@ -133,6 +133,9 @@ test("differences are exact to 0.1 kg", () => {
   assert.equal(core.spokenDiff("前回との差", -2), "前回との差 マイナス 0.2 キログラム");
   assert.equal(core.spokenDiff("開始からの差", 4), "開始からの差 プラス 0.4 キログラム");
   assert.equal(core.formatKg(63), "63.0 kg");
+  assert.equal(core.formatKgNumber(63), "63.0");
+  assert.equal(core.formatKgNumber(64.8), "64.8");
+  assert.equal(core.formatKgNumber(400), "400.0");
 });
 
 test("overwriting the oldest week changes every start difference", () => {
