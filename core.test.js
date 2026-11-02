@@ -145,6 +145,28 @@ test("overwriting the oldest week changes every start difference", () => {
   assert.deepEqual(rows.map((row) => row.diffTenths), [null, 2, -3]);
 });
 
+test("overwriting a later week keeps the start weight (screen records 05 to 08)", () => {
+  // The same steps as the screen records, with the same made-up values.
+  let records = core.upsertRecord([], r("2026-10-12", core.parseKgInput("６３．０").kg));
+  records = core.upsertRecord(records, r("2026-10-26", core.parseKgInput("62,9").kg));
+  records = core.upsertRecord(records, r("2026-11-04", 62.7));
+  let summary = core.summarize(records, "2026-11-04");
+  assert.equal(summary.start.kg, 63.0);
+  assert.equal(summary.latest.startDiffTenths, -3);
+  records = core.upsertRecord(records, r("2026-11-03", 62.5)); // overwrite the latest week
+  summary = core.summarize(records, "2026-11-04");
+  assert.deepEqual(records, [r("2026-10-12", 63.0), r("2026-10-26", 62.9), r("2026-11-03", 62.5)]);
+  assert.equal(summary.start.kg, 63.0);
+  assert.equal(summary.start.week, "2026-10-12");
+  assert.equal(summary.latest.diffTenths, -4);
+  assert.equal(summary.latest.startDiffTenths, -5);
+  // Overwriting a middle week does not change the start either.
+  records = core.upsertRecord(records, r("2026-10-27", 64.0));
+  summary = core.summarize(records, "2026-11-04");
+  assert.equal(summary.start.kg, 63.0);
+  assert.equal(summary.latest.startDiffTenths, -5);
+});
+
 test("streak counts from the latest record's week", () => {
   const records = [r("2026-10-12", 63.0), r("2026-10-26", 62.9), r("2026-11-02", 62.7)];
   assert.equal(core.streak(records, "2026-11-02"), 2); // design example
