@@ -234,7 +234,7 @@
         if (row.gapWeeks > 1) diff += `（${row.gapWeeks}週前との差）`;
       }
       const tr = el("tr");
-      tr.append(el("td", {}, C.formatWeekLabel(row.week, t)), el("td", { class: "kg" }, C.formatKg(row.kg)), el("td", {}, diff));
+      tr.append(el("td", {}, C.formatWeekRange(row.week, t)), el("td", { class: "kg" }, C.formatKg(row.kg)), el("td", {}, diff));
       table.tBodies[0].append(tr);
     }
     target.replaceChildren(table);

@@ -201,8 +201,9 @@ test("the year is written only when it is not this year", () => {
   assert.equal(core.formatWeekLabel("2026-12-28", "2027-01-05"), "2026年12月28日の週");
   assert.equal(core.formatWeekLabel("2026-12-28", "2026-12-30"), "12月28日の週");
   assert.equal(core.formatWeekLabel("2026-12-28", "2027-01-02"), "2026年12月28日の週"); // judged by Monday
-  assert.equal(core.formatWeekLabelWithDay("2026-11-02", "2026-11-05"), "11月2日（月）の週");
-  assert.equal(core.formatWeekLabelWithDay("2025-11-03", "2026-11-05"), "2025年11月3日（月）の週");
+  assert.equal(core.formatWeekLabelWithDay("2026-11-02", "2026-11-05"), "11月2日（月）から始まる週");
+  assert.equal(core.formatWeekLabelWithDay("2025-11-03", "2026-11-05"), "2025年11月3日（月）から始まる週");
+  assert.equal(core.formatWeekLabelWithDay("2026-12-28", "2027-01-02"), "2026年12月28日（月）から始まる週");
   assert.equal(core.formatDate("2027-01-01", "2027-01-05"), "1月1日"); // a single date uses its own year
   assert.equal(core.formatDate("2026-12-31", "2027-01-05"), "2026年12月31日");
   assert.equal(core.formatWeekRange("2026-11-02", "2026-11-05"), "11月2日〜8日");
@@ -210,6 +211,13 @@ test("the year is written only when it is not this year", () => {
   assert.equal(core.formatWeekRange("2026-12-28", "2026-12-30"), "12月28日〜1月3日");
   assert.equal(core.formatWeekRange("2026-12-28", "2027-01-05"), "2026年12月28日〜2027年1月3日");
   assert.equal(core.formatWeekRange("2025-11-03", "2026-11-05"), "2025年11月3日〜9日");
+});
+
+test("a record on a Wednesday is shown as the week starting on Monday", () => {
+  const week = core.weekOf("2026-11-04");
+  assert.equal(core.formatWeekLabelWithDay(week, "2026-11-04"), "11月2日（月）から始まる週");
+  assert.equal(core.formatWeekRange(week, "2026-11-04"), "11月2日〜8日"); // the history row includes 11月4日
+  assert.equal(core.formatWeekRange(core.weekOf("2026-11-01"), "2026-11-04"), "10月26日〜11月1日");
 });
 
 // ---- chart ----
