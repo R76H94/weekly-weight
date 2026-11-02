@@ -74,10 +74,9 @@ test("only the 'kept in this browser' text is marked to hide when storage is una
   assert.ok(parts[0].startsWith("記録はこの端末のブラウザの中だけに保存されます。"), "record note is marked");
   assert.ok(parts.some((text) => text.startsWith("記録は、この端末のブラウザの中だけに保存")), "backup text is marked");
   for (const text of parts) assert.ok(!text.includes("外部へ送信しません"), "the 'not sent out' text stays");
-  // The two "not sent out" sentences and the two backup buttons are not inside a marked part.
+  // The "not sent out" sentence and the two backup buttons are not inside a marked part.
   const unmarked = html.replace(/<(\w+)\b[^>]*\bdata-storage-explanation\b[^>]*>[\s\S]*?<\/\1>/g, "");
   assert.ok(unmarked.includes("入力した内容は外部へ送信しません。"));
-  assert.ok(unmarked.includes("<p>入力した体重や日付は、外部へ送信しません。</p>"));
   assert.ok(unmarked.includes('id="export"') && unmarked.includes('id="import"'));
   assert.ok(sources["app.js"].includes("[data-storage-explanation]"));
 });
@@ -94,7 +93,6 @@ test("the backup section says what the plan requires, in plain words", () => {
     "今の端末で「バックアップを保存」",
     "できたバックアップを、メールなどで新しい端末へ",
     "新しい端末で「バックアップを読み込む」",
-    "入力した体重や日付は、外部へ送信しません。",
   ]) {
     assert.ok(text.includes(part), part);
   }
@@ -103,6 +101,17 @@ test("the backup section says what the plan requires, in plain words", () => {
   assert.ok(start >= 0 && end > start);
   const body = text.slice(start, end);
   for (const word of ["ファイル", "ダウンロード", "json", "JSON"]) assert.ok(!body.includes(word), word);
+});
+
+test("'not sent out' is written once, in the record section, before the first entry", () => {
+  // Design 3-7: the plan asks for it on the screen, not for a number of times.
+  const html = sources["index.html"];
+  const text = html.replace(/<[^>]+>/g, "").replace(/\s+/g, "");
+  assert.equal(text.match(/外部へ送信しません/g).length, 1);
+  assert.ok(!sources["app.js"].includes("外部へ送信") && !sources["core.js"].includes("外部へ送信"));
+  const record = html.slice(html.indexOf('<section aria-labelledby="h-record">'), html.indexOf('id="numbers-section"'));
+  // Shown in every state: it is outside the part hidden while storage is unavailable.
+  assert.ok(record.includes("</span>入力した内容は外部へ送信しません。</p>"));
 });
 
 test("history numbers do not wrap and the unit is in the header", () => {
