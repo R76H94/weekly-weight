@@ -147,3 +147,16 @@ test("starting over without a backup is offered only for broken data, behind a c
   assert.ok(yes.indexOf("if (!broken || unavailable) return;") < yes.indexOf("C.discardSavedData("));
   assert.ok(app.includes('$("discard-no").focus();'));
 });
+
+test("the 'cannot store' message gives a hint without naming a device, still three sentences", () => {
+  const match = /<p id="unavailable"[^>]*>([^<]*)<\/p>/.exec(sources["index.html"]);
+  assert.ok(match);
+  assert.equal(
+    match[1],
+    "このブラウザでは、記録の保存が許可されていません。" +
+      "ブラウザの設定でCookie（サイトのデータ）の保存を許可するか、プライベートブラウズではない通常の画面で、開き直してください。" +
+      "記録は変更していません。",
+  );
+  assert.equal(match[1].split("。").filter(Boolean).length, 3);
+  for (const word of ["iPhone", "Android", "Safari", "Chrome"]) assert.ok(!match[1].includes(word), word);
+});
