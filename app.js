@@ -130,7 +130,7 @@
     if (latest.diffTenths === null) {
       cards.push(card("前回との差", "—", C.ONE_RECORD_NOTE));
     } else {
-      const label = latest.gapWeeks > 1 ? `前回との差（${latest.gapWeeks}週前）` : "前回との差";
+      const label = C.previousDiffLabel(latest);
       cards.push(
         card(
           label,
@@ -216,7 +216,7 @@
   function renderHistory(t) {
     const target = $("history");
     const more = $("more");
-    const rows = C.buildRows(records).reverse();
+    const rows = C.historyRows(records, t);
     if (!rows.length) {
       target.replaceChildren(el("p", {}, "まだ記録がありません。"));
       more.hidden = true;
@@ -237,7 +237,7 @@
       if (row.diffTenths === null) diff.textContent = "—";
       else {
         diff.append(el("span", { class: "num" }, C.formatDiff(row.diffTenths)));
-        if (row.gapWeeks > 1) diff.append(`（${row.gapWeeks}週前との差）`);
+        if (row.diffNote) diff.append(row.diffNote);
       }
       const tr = el("tr");
       tr.append(
@@ -246,6 +246,13 @@
         diff,
       );
       table.tBodies[0].append(tr);
+      // The weeks without a record get their own row, so a skipped week is seen
+      // without reading the note (design 3-6). Only record rows count for "さらに表示".
+      if (row.gapBelow) {
+        const gap = el("tr", { class: "gap" });
+        gap.append(el("td", { colspan: "3" }, row.gapBelow));
+        table.tBodies[0].append(gap);
+      }
     }
     target.replaceChildren(table);
     more.hidden = rows.length <= shownRows;

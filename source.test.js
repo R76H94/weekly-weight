@@ -114,6 +114,15 @@ test("history numbers do not wrap and the unit is in the header", () => {
   assert.ok(app.includes('el("span", { class: "num" }, C.formatDiff(row.diffTenths))'));
 });
 
+test("skipped weeks are not shown as a week count, and get their own history row", () => {
+  // "2週前" read like the streak "連続 2 週" (design 2, 差の計算).
+  for (const name of FILES) assert.ok(!sources[name].includes("週前"), `${name} still writes a week count`);
+  const app = sources["app.js"];
+  assert.ok(app.includes("C.historyRows(records, t)"));
+  assert.ok(app.includes('el("td", { colspan: "3" }, row.gapBelow)'));
+  assert.ok(app.includes("C.previousDiffLabel(latest)"));
+});
+
 test("the prototype storage key is not used", () => {
   for (const [name, text] of Object.entries(sources)) {
     assert.ok(!/(getItem|setItem|removeItem)\(\s*["']weekly-weight["']/.test(text), `${name} touches the old key`);

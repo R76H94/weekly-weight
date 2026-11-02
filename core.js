@@ -183,17 +183,21 @@
     return `${formatWeekStart(week, today)}（月）から始まる週`;
   }
 
+  // From a Monday to a Sunday. The year follows the Monday; the Sunday gets a year
+  // only when the Monday has one and the years differ.
+  function formatRange(monday, sunday, today) {
+    const start = formatWeekStart(monday, today);
+    const withYear = yearOf(monday) !== yearOf(today);
+    let endText;
+    if (withYear && yearOf(sunday) !== yearOf(monday)) endText = `${yearOf(sunday)}年${monthDay(sunday)}`;
+    else if (sunday.slice(0, 7) !== monday.slice(0, 7)) endText = monthDay(sunday);
+    else endText = `${Number(sunday.slice(8, 10))}日`;
+    return `${start}〜${endText}`;
+  }
+
   // "11月2日〜8日", "10月26日〜11月1日", "2026年12月28日〜2027年1月3日".
   function formatWeekRange(week, today) {
-    const sunday = addWeeks(week, 1);
-    const end = fromUtc(toUtc(sunday) - DAY_MS);
-    const start = formatWeekStart(week, today);
-    const withYear = yearOf(week) !== yearOf(today);
-    let endText;
-    if (withYear && yearOf(end) !== yearOf(week)) endText = `${yearOf(end)}年${monthDay(end)}`;
-    else if (end.slice(5, 7) !== week.slice(5, 7)) endText = monthDay(end);
-    else endText = `${Number(end.slice(8, 10))}日`;
-    return `${start}〜${endText}`;
+    return formatRange(week, fromUtc(toUtc(addWeeks(week, 1)) - DAY_MS), today);
   }
 
   function nextRecordText(records, today) {
@@ -225,6 +229,35 @@
     const abs = (Math.abs(tenths) / 10).toFixed(1);
     const sign = tenths === 0 ? "プラスマイナス" : tenths > 0 ? "プラス" : "マイナス";
     return `${label} ${sign} ${abs} キログラム`;
+  }
+
+  // ---- weeks without a record ----
+  // A count of weeks before is not written: it reads like the streak ("連続 2 週").
+  // The compared week is named by its date instead, and the empty weeks get a row.
+
+  function hasGap(row) {
+    return row.gapWeeks !== null && row.gapWeeks > 1;
+  }
+
+  function previousDiffLabel(row) {
+    return hasGap(row) ? "前回との差（記録のない週をはさむ）" : "前回との差";
+  }
+
+  // History rows, newest first. diffNote follows the difference when weeks were
+  // skipped; gapBelow is the line for the skipped weeks, shown under the row.
+  function historyRows(records, today) {
+    return buildRows(records)
+      .map((row) => {
+        if (!hasGap(row)) return { ...row, diffNote: "", gapBelow: null };
+        const firstEmpty = addWeeks(row.previous.week, 1);
+        const lastEmptySunday = fromUtc(toUtc(row.week) - DAY_MS);
+        return {
+          ...row,
+          diffNote: `（${formatWeekLabel(row.previous.week, today)}と比べた差）`,
+          gapBelow: `${formatRange(firstEmpty, lastEmptySunday, today)}は記録なし`,
+        };
+      })
+      .reverse();
   }
 
   // ---- chart ----
@@ -503,6 +536,8 @@
     formatWeekLabel,
     formatWeekLabelWithDay,
     formatWeekRange,
+    historyRows,
+    previousDiffLabel,
     formatKg,
     formatKgNumber,
     formatDiff,

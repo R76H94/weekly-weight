@@ -120,6 +120,37 @@ test("rows follow the design example, including a skipped week", () => {
   assert.deepEqual(rows[2].previous, { week: "2026-10-26", kg: 62.9 });
 });
 
+test("a skipped week is named by date and gets its own history row, never a week count", () => {
+  const records = [r("2026-11-02", 62.7), r("2026-10-12", 63.0), r("2026-10-26", 62.9)];
+  const rows = core.historyRows(records, "2026-11-04");
+  assert.deepEqual(
+    rows.map((row) => [row.week, row.diffNote, row.gapBelow]),
+    [
+      ["2026-11-02", "", null],
+      ["2026-10-26", "（10月12日の週と比べた差）", "10月19日〜25日は記録なし"],
+      ["2026-10-12", "", null],
+    ],
+  );
+  for (const row of rows) {
+    assert.ok(!/\d週/.test(row.diffNote + (row.gapBelow ?? "")), "no week count that reads like the streak");
+  }
+  const summary = core.summarize(records, "2026-11-04");
+  assert.equal(core.previousDiffLabel(summary.latest), "前回との差");
+  assert.equal(core.previousDiffLabel(core.buildRows(records)[1]), "前回との差（記録のない週をはさむ）");
+});
+
+test("several skipped weeks make one row, across months and years", () => {
+  const rows = core.historyRows([r("2026-09-01", 63.4), r("2026-10-07", 63.1)], "2026-11-04");
+  // 9月1日 is in the week of 8月31日; 10月7日 in the week of 10月5日.
+  assert.equal(rows[0].gapBelow, "9月7日〜10月4日は記録なし");
+  assert.equal(rows[0].diffNote, "（8月31日の週と比べた差）");
+  const late = core.historyRows([r("2026-12-16", 64.1), r("2027-01-13", 63.8)], "2027-02-01");
+  assert.equal(late[0].gapBelow, "2026年12月21日〜2027年1月10日は記録なし");
+  assert.equal(late[0].diffNote, "（2026年12月14日の週と比べた差）");
+  const sameYear = core.historyRows([r("2026-12-16", 64.1), r("2027-01-13", 63.8)], "2026-12-31");
+  assert.equal(sameYear[0].gapBelow, "12月21日〜1月10日は記録なし");
+});
+
 test("differences are exact to 0.1 kg", () => {
   // 62.3 - 62.0 is not exactly 0.3 in floating point.
   assert.notEqual(62.3 - 62.0, 0.3);
