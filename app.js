@@ -1,196 +1,409 @@
-const { addEntry, parseBackup, summarize } = WeeklyCore;
-const KEY = "weekly-weight";
-const $ = (id) => document.getElementById(id);
+// Screen for 週イチ体重. All calculations and checks are in core.js.
+(function () {
+  "use strict";
 
-let isStorageOk = true;
-let state = load();
+  const C = WeeklyCore;
+  const $ = (id) => document.getElementById(id);
+  const PAGE = 12;
+  const SVG_NS = "http://www.w3.org/2000/svg";
 
-function load() {
-  try {
-    const saved = localStorage.getItem(KEY);
-    if (saved) return parseBackup(saved);
-  } catch {
-    isStorageOk = false;
-  }
-  return { entries: [], settings: { heightCm: null, goalKg: null } };
-}
-
-function save() {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(state));
-    isStorageOk = true;
-  } catch {
-    isStorageOk = false;
-  }
-}
-
-function today() {
-  const now = new Date();
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-}
-
-function signed(value) {
-  const rounded = Math.round(value * 10) / 10;
-  return `${rounded > 0 ? "+" : ""}${rounded.toFixed(1)}`;
-}
-
-function statusText(summary) {
-  if (!summary.latest) return "最初の体重を入れましょう";
-  if (!summary.isDoneThisWeek) return "今週の体重を入れましょう";
-  return summary.streak > 1 ? `今週も記録できました。${summary.streak}週連続です` : "今週の記録は完了です。また来週";
-}
-
-function renderStats(summary) {
-  const items = [
-    ["最新", summary.latest ? `${summary.latest.kg.toFixed(1)}kg` : "-"],
-    ["前回から", summary.change === null ? "-" : `${signed(summary.change)}kg`],
-    ["開始から", summary.totalChange === null ? "-" : `${signed(summary.totalChange)}kg`],
-    ["連続", `${summary.streak}週`],
-    ["BMI", summary.bmi === null ? "-" : summary.bmi.toFixed(1)],
-    ["目標まで", summary.toGoal === null ? "-" : `${Math.max(summary.toGoal, 0).toFixed(1)}kg`],
-  ];
-  $("stats").replaceChildren(
-    ...items.map(([label, value]) => {
-      const box = document.createElement("div");
-      box.className = "stat";
-      const number = document.createElement("b");
-      number.textContent = value;
-      const caption = document.createElement("span");
-      caption.textContent = label;
-      box.append(number, caption);
-      return box;
-    }),
-  );
-}
-
-function svgElement(name, attributes, text) {
-  const element = document.createElementNS("http://www.w3.org/2000/svg", name);
-  for (const [key, value] of Object.entries(attributes)) element.setAttribute(key, value);
-  if (text !== undefined) element.textContent = text;
-  return element;
-}
-
-function renderChart(entries, goal) {
-  if (entries.length < 2) {
-    $("chart").textContent = "2回記録するとグラフが出ます。";
-    return;
-  }
-  const width = 520;
-  const height = 200;
-  const left = 44;
-  const right = 12;
-  const top = 12;
-  const bottom = 26;
-  const values = entries.map((entry) => entry.kg);
-  if (goal) values.push(goal);
-  const low = Math.floor(Math.min(...values) - 1);
-  const high = Math.ceil(Math.max(...values) + 1);
-  const times = entries.map((entry) => Date.parse(entry.date));
-  const first = times[0];
-  const span = times[times.length - 1] - first || 1;
-  const x = (time) => left + ((time - first) / span) * (width - left - right);
-  const y = (kg) => top + ((high - kg) / (high - low)) * (height - top - bottom);
-
-  const svg = svgElement("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "体重の推移" });
-  for (const kg of [low, high]) {
-    svg.append(
-      svgElement("line", { x1: left, x2: width - right, y1: y(kg), y2: y(kg), stroke: "var(--line)" }),
-      svgElement("text", { x: left - 6, y: y(kg) + 4, "text-anchor": "end" }, String(kg)),
-    );
-  }
-  if (goal) {
-    svg.append(
-      svgElement("line", { x1: left, x2: width - right, y1: y(goal), y2: y(goal), stroke: "var(--warn)", "stroke-dasharray": "5 5" }),
-      svgElement("text", { x: width - right, y: y(goal) - 5, "text-anchor": "end" }, `目標 ${goal}kg`),
-    );
-  }
-  const points = entries.map((entry, index) => `${x(times[index])},${y(entry.kg)}`).join(" ");
-  svg.append(svgElement("polyline", { points, fill: "none", stroke: "var(--accent)", "stroke-width": 2.5 }));
-  entries.forEach((entry, index) => {
-    svg.append(svgElement("circle", { cx: x(times[index]), cy: y(entry.kg), r: 3.5, fill: "var(--accent)" }));
-  });
-  const shortDate = (date) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
-  svg.append(
-    svgElement("text", { x: left, y: height - 6 }, shortDate(entries[0].date)),
-    svgElement("text", { x: width - right, y: height - 6, "text-anchor": "end" }, shortDate(entries[entries.length - 1].date)),
-  );
-  $("chart").replaceChildren(svg);
-}
-
-function renderHistory(entries) {
-  $("history").replaceChildren(
-    ...[...entries].reverse().map((entry) => {
-      const row = document.createElement("li");
-      const date = document.createElement("span");
-      date.textContent = entry.date;
-      const kg = document.createElement("span");
-      kg.textContent = `${entry.kg.toFixed(1)}kg`;
-      row.append(date, kg);
-      return row;
-    }),
-  );
-}
-
-function render() {
-  const summary = summarize(state.entries, today(), state.settings);
-  $("status").textContent = statusText(summary);
-  renderStats(summary);
-  renderChart(state.entries, state.settings.goalKg);
-  renderHistory(state.entries);
-  $("height").value = state.settings.heightCm ?? "";
-  $("goal").value = state.settings.goalKg ?? "";
-  if (!isStorageOk) $("message").textContent = "このブラウザでは保存できません。閉じると記録が消えます。";
-}
-
-$("entry-form").addEventListener("submit", (event) => {
-  event.preventDefault();
-  try {
-    state.entries = addEntry(state.entries, { date: $("date").value, kg: Number($("kg").value) });
-    save();
-    $("kg").value = "";
-    $("message").textContent = "";
-    render();
-  } catch (error) {
-    $("message").textContent = error.message;
-  }
-});
-
-$("settings-form").addEventListener("submit", (event) => {
-  event.preventDefault();
-  state.settings = {
-    heightCm: Number($("height").value) || null,
-    goalKg: Number($("goal").value) || null,
+  const KG_MESSAGES = {
+    EMPTY: "体重を入れてください。",
+    NOT_NUMBER: "数字で入れてください。例：62.4",
+    RANGE: "20.0〜400.0 kg の範囲で入れてください。",
+    DECIMALS: "小数は第1位までで入れてください。例：62.4",
   };
-  save();
-  render();
-});
+  const DATE_MESSAGES = {
+    EMPTY: "日付を選んでください。",
+    FUTURE: "今日までの日付を選んでください。",
+  };
+  const SAVE_FAILED =
+    "保存できませんでした。ブラウザの保存領域がいっぱいか、保存が許可されていない可能性があります。バックアップを保存してから、もう一度お試しください。";
+  const IMPORT_MESSAGES = {
+    UNREADABLE: "このファイルは読み込めませんでした。週イチ体重で保存したファイルを選んでください。記録は変わっていません。",
+    WRONG_FORMAT: "このファイルは週イチ体重のバックアップではないか、対応していない版です。記録は変わっていません。",
+    DUPLICATE_WEEK: "ファイルの中に、同じ週の記録が重なっています。記録は変わっていません。",
+  };
 
-$("export").addEventListener("click", () => {
-  const url = URL.createObjectURL(new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `weekly-weight-${today()}.json`;
-  link.click();
-  URL.revokeObjectURL(url);
-});
-
-$("import").addEventListener("click", () => $("import-file").click());
-
-$("import-file").addEventListener("change", async (event) => {
-  const [file] = event.target.files;
-  event.target.value = "";
-  if (!file) return;
+  // Accessing localStorage itself can throw when the browser blocks it.
+  let storage = null;
   try {
-    const restored = parseBackup(await file.text());
-    if (!confirm(`今の記録を、バックアップの${restored.entries.length}件に置き換えます。よろしいですか？`)) return;
-    state = restored;
-    save();
-    $("message").textContent = "";
-    render();
+    storage = window.localStorage;
   } catch {
-    $("message").textContent = "バックアップを読み込めませんでした。";
+    storage = null;
   }
-});
 
-$("date").value = today();
-render();
+  // Local date as YYYY-MM-DD. Read fresh each time, the page may stay open past midnight.
+  function today() {
+    const now = new Date();
+    return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  }
+
+  // "broken" means the saved data exists but could not be read. Nothing is written
+  // to the saved key in that state until the user confirms replacing it from a file.
+  const loaded = C.loadRecords(storage, today());
+  let broken = loaded.state === "broken";
+  let records = broken ? [] : loaded.records;
+  let shownRows = PAGE;
+  let pending = null;
+
+  const kgInput = $("kg");
+  const dateInput = $("date");
+
+  // ---- small helpers ----
+
+  function el(tag, attributes = {}, text) {
+    const node = document.createElement(tag);
+    for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, value);
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function svg(tag, attributes = {}, text) {
+    const node = document.createElementNS(SVG_NS, tag);
+    for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, String(value));
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function show(node, text) {
+    node.textContent = text;
+    node.hidden = false;
+  }
+
+  function hide(node) {
+    node.textContent = "";
+    node.hidden = true;
+  }
+
+  function setFieldError(input, box, message) {
+    show(box, message);
+    input.setAttribute("aria-invalid", "true");
+    input.setAttribute("aria-describedby", box.id);
+  }
+
+  function clearFieldError(input, box) {
+    hide(box);
+    input.removeAttribute("aria-invalid");
+    input.removeAttribute("aria-describedby");
+  }
+
+  function clearFormMessages() {
+    clearFieldError(kgInput, $("kg-error"));
+    clearFieldError(dateInput, $("date-error"));
+    hide($("save-error"));
+    $("done").replaceChildren();
+  }
+
+  // ---- rendering ----
+
+  function renderBroken() {
+    $("broken").hidden = !broken;
+    for (const id of ["kg", "date", "submit", "export"]) $(id).disabled = broken;
+    // While the saved data cannot be read, no zero-record text is shown.
+    for (const id of ["numbers-section", "chart-section", "history-section"]) $(id).hidden = broken;
+    if (broken) hide($("overwrite"));
+  }
+
+  function card(label, value, sub, spoken) {
+    const box = el("div", { class: "card" });
+    const valueNode = el("p", { class: "value" }, value);
+    if (spoken) valueNode.setAttribute("aria-label", spoken);
+    box.append(el("p", { class: "label" }, label), valueNode, el("p", { class: "sub" }, sub));
+    return box;
+  }
+
+  function renderNumbers(t) {
+    const summary = C.summarize(records, t);
+    const target = $("numbers");
+    if (!summary.count) {
+      target.replaceChildren(el("p", {}, "まだ記録がありません。最初の1件を入れると、ここに数字が出ます。"));
+      return;
+    }
+    const latest = summary.latest;
+    const cards = [card("最新の体重", C.formatKg(latest.kg), C.formatWeekLabelWithDay(latest.week, t))];
+
+    if (latest.diffTenths === null) {
+      cards.push(card("前回との差", "—", "比べる記録がまだありません"));
+    } else {
+      const label = latest.gapWeeks > 1 ? `前回との差（${latest.gapWeeks}週前）` : "前回との差";
+      cards.push(
+        card(
+          label,
+          `${C.formatDiff(latest.diffTenths)} kg`,
+          `前回 ${C.formatWeekLabel(latest.previous.week, t)} ${C.formatKg(latest.previous.kg)} と比べた差`,
+          C.spokenDiff(label, latest.diffTenths),
+        ),
+      );
+    }
+
+    if (latest.startDiffTenths === null) {
+      cards.push(card("開始からの差", "—", "次の週から表示します"));
+    } else {
+      cards.push(
+        card(
+          "開始からの差",
+          `${C.formatDiff(latest.startDiffTenths)} kg`,
+          `開始 ${C.formatWeekLabel(summary.start.week, t)} ${C.formatKg(summary.start.kg)} と比べた差`,
+          C.spokenDiff("開始からの差", latest.startDiffTenths),
+        ),
+      );
+    }
+
+    if (summary.streak === null) cards.push(card("連続週数", "—", "今週の記録から、また数えます"));
+    else cards.push(card("連続週数", `${summary.streak} 週`, "記録した週が続いている数"));
+
+    const grid = el("div", { class: "cards" });
+    grid.append(...cards);
+    target.replaceChildren(grid);
+  }
+
+  function renderChart(t) {
+    const target = $("chart");
+    const note = $("chart-note");
+    const model = C.chartModel(records, t);
+    if (!model) {
+      target.replaceChildren(el("p", {}, "記録が入ると、ここにグラフが出ます。"));
+      hide(note);
+      return;
+    }
+    const { plot, points } = model;
+    const root = svg("svg", { viewBox: `0 0 ${model.width} ${model.height}`, role: "img", "aria-label": model.label });
+    root.append(
+      svg("rect", {
+        x: plot.left,
+        y: plot.top,
+        width: plot.right - plot.left,
+        height: plot.bottom - plot.top,
+        fill: "none",
+        stroke: "var(--line)",
+        "stroke-width": 1,
+      }),
+      svg("text", { x: plot.left - 8, y: plot.top + 5, "text-anchor": "end" }, model.yTop),
+      svg("text", { x: plot.left - 8, y: plot.bottom + 5, "text-anchor": "end" }, model.yBottom),
+    );
+    const labelY = model.height - 8;
+    if (points.length === 1) {
+      root.append(svg("text", { x: points[0].x, y: labelY, "text-anchor": "middle" }, model.xFirst));
+    } else {
+      root.append(
+        svg("text", { x: 2, y: labelY, "text-anchor": "start" }, model.xFirst),
+        svg("text", { x: model.width - 2, y: labelY, "text-anchor": "end" }, model.xLast),
+      );
+      root.append(
+        svg("polyline", {
+          points: points.map((p) => `${p.x},${p.y}`).join(" "),
+          fill: "none",
+          stroke: "var(--accent)",
+          "stroke-width": 2,
+        }),
+      );
+    }
+    for (const p of points) {
+      root.append(svg("circle", { cx: p.x, cy: p.y, r: p.latest ? 6 : 4, fill: "var(--accent)" }));
+    }
+    target.replaceChildren(root);
+
+    if (points.length === 1) show(note, "2件目の記録からグラフになります");
+    else if (model.truncated) show(note, "直近52週を表示しています。");
+    else hide(note);
+  }
+
+  function renderHistory(t) {
+    const target = $("history");
+    const more = $("more");
+    const rows = C.buildRows(records).reverse();
+    if (!rows.length) {
+      target.replaceChildren(el("p", {}, "まだ記録がありません。"));
+      more.hidden = true;
+      return;
+    }
+    const table = el("table");
+    const head = el("tr");
+    for (const name of ["週", "体重", "前回との差"]) head.append(el("th", { scope: "col" }, name));
+    table.append(el("thead"), el("tbody"));
+    table.tHead.append(head);
+    for (const row of rows.slice(0, shownRows)) {
+      let diff = "—";
+      if (row.diffTenths !== null) {
+        diff = `${C.formatDiff(row.diffTenths)} kg`;
+        if (row.gapWeeks > 1) diff += `（${row.gapWeeks}週前との差）`;
+      }
+      const tr = el("tr");
+      tr.append(el("td", {}, C.formatWeekLabel(row.week, t)), el("td", {}, C.formatKg(row.kg)), el("td", {}, diff));
+      table.tBodies[0].append(tr);
+    }
+    target.replaceChildren(table);
+    more.hidden = rows.length <= shownRows;
+  }
+
+  function renderLastBackup(t) {
+    const date = C.loadLastBackup(storage);
+    $("last-backup").textContent = date
+      ? `最後にバックアップを作った日：${C.formatDate(date, t)}`
+      : "バックアップはまだ作っていません。";
+  }
+
+  function render() {
+    const t = today();
+    dateInput.max = t;
+    renderBroken();
+    if (!broken) {
+      renderNumbers(t);
+      renderChart(t);
+      renderHistory(t);
+    }
+    renderLastBackup(t);
+  }
+
+  // ---- recording ----
+
+  function updateOverwriteNotice() {
+    const box = $("overwrite");
+    if (broken) return hide(box);
+    const existing = C.findSameWeek(records, dateInput.value);
+    if (!existing) return hide(box);
+    const range = C.formatWeekRange(C.weekOf(existing.date), today());
+    show(box, `この週（${range}）には ${C.formatKg(existing.kg)} の記録があります。記録すると上書きします。`);
+  }
+
+  $("entry-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (broken) return;
+    clearFormMessages();
+    const t = today();
+    const kg = C.parseKgInput(kgInput.value);
+    const date = dateInput.value;
+    const dateCheck = C.checkDate(date, t);
+    if (!kg.ok) setFieldError(kgInput, $("kg-error"), KG_MESSAGES[kg.error]);
+    if (!dateCheck.ok) setFieldError(dateInput, $("date-error"), DATE_MESSAGES[dateCheck.error]);
+    if (!kg.ok) return kgInput.focus();
+    if (!dateCheck.ok) return dateInput.focus();
+
+    const existing = C.findSameWeek(records, date);
+    const next = C.upsertRecord(records, { date, kg: kg.kg });
+    // The screen changes only after the new records are stored.
+    if (!C.saveRecords(storage, next)) {
+      show($("save-error"), SAVE_FAILED);
+      return;
+    }
+    records = next;
+    kgInput.value = "";
+    dateInput.value = t;
+    hide($("overwrite"));
+    render();
+
+    const lines = [];
+    if (existing) lines.push(`${C.formatWeekRange(C.weekOf(date), t)}の週の記録を上書きしました。`);
+    const count = C.streak(records, t);
+    lines.push(count === null ? "記録しました。" : `記録しました。連続 ${count} 週です。`);
+    lines.push(`${C.formatKg(kg.kg)}（${C.formatDate(date, t)}）`);
+    $("done").replaceChildren(...lines.map((line) => el("p", {}, line)));
+  });
+
+  for (const input of [kgInput, dateInput]) {
+    input.addEventListener("input", () => $("done").replaceChildren());
+  }
+  dateInput.addEventListener("change", updateOverwriteNotice);
+  kgInput.addEventListener("blur", updateOverwriteNotice);
+
+  $("more").addEventListener("click", () => {
+    shownRows += PAGE;
+    renderHistory(today());
+  });
+
+  // ---- backup ----
+
+  function backupStatus(text) {
+    $("backup-status").textContent = text;
+  }
+
+  $("export").addEventListener("click", () => {
+    if (broken) return;
+    const t = today();
+    if (!records.length) {
+      backupStatus("保存する記録がまだありません。");
+      return;
+    }
+    const name = C.backupFileName(t);
+    const url = URL.createObjectURL(new Blob([C.buildBackup(records, new Date())], { type: "application/json" }));
+    const link = el("a", { href: url, download: name });
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    // A failure to remember the date does not make the backup fail.
+    if (C.saveLastBackup(storage, t)) renderLastBackup(t);
+    backupStatus(`バックアップのファイルを作りました。ファイル名：${name}。ダウンロード先にあることを確認してください。`);
+  });
+
+  $("import").addEventListener("click", () => $("import-file").click());
+
+  function closePanel() {
+    pending = null;
+    $("replace-panel").hidden = true;
+  }
+
+  $("import-file").addEventListener("change", async (event) => {
+    const [file] = event.target.files;
+    event.target.value = "";
+    if (!file) return;
+    closePanel();
+    let text;
+    if (file.size > C.MAX_BACKUP_BYTES) {
+      backupStatus(IMPORT_MESSAGES.UNREADABLE);
+      return;
+    }
+    try {
+      text = await file.text();
+    } catch {
+      backupStatus(IMPORT_MESSAGES.UNREADABLE);
+      return;
+    }
+    const result = C.parseBackup(text, today());
+    if (!result.ok) {
+      backupStatus(
+        result.error === "BAD_RECORD"
+          ? `ファイルの中に、読み込めない記録があります（${result.index} 件目）。記録は変わっていません。`
+          : IMPORT_MESSAGES[result.error],
+      );
+      return;
+    }
+    pending = result.records;
+    backupStatus("");
+    $("replace-text").textContent = broken
+      ? `読み込めなかった保存データを、ファイルの記録 ${pending.length} 件に置き換えます。置き換えると、元の保存データは戻せません。`
+      : `いまの記録 ${records.length} 件を、ファイルの記録 ${pending.length} 件に置き換えます。置き換えると、いまの記録は戻せません。`;
+    $("replace-panel").hidden = false;
+    $("replace-no").focus();
+  });
+
+  $("replace-no").addEventListener("click", () => {
+    closePanel();
+    backupStatus("読み込みをやめました。記録は変わっていません。");
+    $("import").focus();
+  });
+
+  $("replace-yes").addEventListener("click", () => {
+    if (!pending) return;
+    const next = pending;
+    // The only place that writes over saved data that could not be read.
+    if (!C.saveRecords(storage, next)) {
+      closePanel();
+      backupStatus("記録を保存できませんでした。記録は変わっていません。");
+      $("import").focus();
+      return;
+    }
+    records = next;
+    broken = false;
+    shownRows = PAGE;
+    closePanel();
+    clearFormMessages();
+    render();
+    backupStatus(`${next.length} 件の記録を読み込みました。`);
+    $("import").focus();
+  });
+
+  dateInput.value = today();
+  render();
+})();

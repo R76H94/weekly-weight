@@ -6,101 +6,204 @@
 <title>週イチ体重</title>
 <style>
   :root {
-    --bg: #f6f5f1; --card: #ffffff; --text: #24231f; --muted: #6f6c63;
-    --line: #dedbd2; --accent: #2f6f62; --accent-text: #ffffff; --warn: #a3481f;
+    --bg: #f6f5f1;
+    --card: #ffffff;
+    --text: #24231f;
+    --muted: #5f5c54;
+    --line: #cfcbc0;
+    --accent: #2f6f62;
+    --accent-text: #ffffff;
+    --error: #a3481f;
+    --focus: #1a56c4;
+
+    --font-body: "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+    --fs-base: 1rem;
+    --fs-small: 0.875rem;
+    --fs-number: 1.5rem;
+    --fs-input: 1.5rem;
+    --fs-h1: 1.25rem;
+    --fs-h2: 1.0625rem;
+    --lh: 1.7;
+
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 24px;
+    --sp-6: 32px;
+    --radius: 8px;
+    --tap: 48px;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #1b1c1a; --card: #262725; --text: #ecebe6; --muted: #a5a39b;
-      --line: #3c3d39; --accent: #7cc4b2; --accent-text: #14211e; --warn: #eb9a72;
+      --bg: #1b1c1a;
+      --card: #262725;
+      --text: #ecebe6;
+      --muted: #b0aea6;
+      --line: #4a4b46;
+      --accent: #7cc4b2;
+      --accent-text: #14211e;
+      --error: #f0a47c;
+      --focus: #8db4ff;
     }
   }
   * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
   body {
-    margin: 0; background: var(--bg); color: var(--text);
-    font-family: "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif; line-height: 1.6;
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: var(--fs-base);
+    line-height: var(--lh);
+    overflow-wrap: anywhere;
   }
-  main { max-width: 560px; margin: 0 auto; padding: 24px 16px 48px; }
-  h1 { font-size: 1.1rem; margin: 0 0 16px; color: var(--muted); font-weight: 600; }
-  h2 { font-size: 1rem; margin: 0 0 12px; }
-  section { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 18px; margin-bottom: 14px; }
-  #status { font-size: 1.35rem; font-weight: 700; margin: 0 0 14px; }
-  form.entry { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; }
-  label { display: block; font-size: .85rem; color: var(--muted); }
-  input {
-    display: block; width: 100%; margin-top: 4px; padding: 10px; font: inherit;
-    color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+  main {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: var(--sp-5) var(--sp-4) calc(var(--sp-6) + 24px);
   }
-  .kg { flex: 1 1 120px; } .kg input { font-size: 1.4rem; font-weight: 700; }
-  .date { flex: 1 1 150px; }
-  form.entry input, form.entry button { height: 52px; }
+  h1 { font-size: var(--fs-h1); margin: 0 0 var(--sp-3); }
+  h2 { font-size: var(--fs-h2); margin: 0 0 var(--sp-3); }
+  p { margin: 0; }
+  section {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: var(--sp-4);
+    margin-bottom: var(--sp-3);
+  }
+  section[hidden], [hidden] { display: none !important; }
+
+  label { display: block; margin-bottom: var(--sp-1); }
+  input[type="text"], input[type="date"] {
+    display: block;
+    width: 100%;
+    min-height: var(--tap);
+    padding: var(--sp-2) var(--sp-3);
+    font: inherit;
+    font-size: var(--fs-base);
+    color: var(--text);
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+  #kg { min-height: 56px; font-size: var(--fs-input); font-variant-numeric: tabular-nums; }
+  .field + .field { margin-top: var(--sp-4); }
+  .field-error { color: var(--error); font-size: var(--fs-small); margin-top: var(--sp-1); }
+  input[aria-invalid="true"] { border-color: var(--error); }
+
   button {
-    padding: 11px 18px; font: inherit; font-weight: 700; cursor: pointer;
-    color: var(--accent-text); background: var(--accent); border: 1px solid var(--accent); border-radius: 6px;
+    display: block;
+    width: 100%;
+    min-height: var(--tap);
+    padding: var(--sp-2) var(--sp-4);
+    font: inherit;
+    border-radius: var(--radius);
+    cursor: pointer;
   }
-  button.sub { color: var(--text); background: transparent; border-color: var(--line); font-weight: 400; }
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; }
-  .stat b { display: block; font-size: 1.3rem; font-variant-numeric: tabular-nums; }
-  .stat span { font-size: .8rem; color: var(--muted); }
+  button + button { margin-top: var(--sp-3); }
+  .primary { background: var(--accent); color: var(--accent-text); border: 1px solid var(--accent); font-weight: 700; }
+  .secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  form .primary { margin-top: var(--sp-4); }
+
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .note { color: var(--muted); font-size: var(--fs-small); margin-top: var(--sp-3); }
+  .notice { margin-top: var(--sp-3); }
+  .error { color: var(--error); margin-top: var(--sp-3); }
+  .done, .panel {
+    margin-top: var(--sp-3);
+    padding: var(--sp-3);
+    background: var(--bg);
+    border-left: 4px solid var(--accent);
+  }
+  .done:empty { display: none; }
+  .panel p { margin-bottom: var(--sp-3); }
+
+  .cards { display: grid; grid-template-columns: 1fr; gap: var(--sp-3); }
+  @media (min-width: 480px) { .cards { grid-template-columns: 1fr 1fr; } }
+  .card { border: 1px solid var(--line); border-radius: var(--radius); padding: var(--sp-3); }
+  .card .label { font-size: var(--fs-small); color: var(--muted); }
+  .card .value { font-size: var(--fs-number); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .card .sub { font-size: var(--fs-small); color: var(--muted); }
+
   svg { display: block; width: 100%; height: auto; }
-  svg text { fill: var(--muted); font-size: 12px; }
-  .row { display: flex; gap: 8px; flex-wrap: wrap; }
-  .row > * { flex: 1 1 130px; }
-  #message { min-height: 1.5em; margin: 10px 0 0; font-size: .9rem; color: var(--warn); }
-  details summary { cursor: pointer; font-weight: 700; }
-  details .row { margin-top: 12px; }
-  .note { font-size: .8rem; color: var(--muted); margin: 12px 0 0; }
-  ul { list-style: none; margin: 0; padding: 0; }
-  li { display: flex; justify-content: space-between; padding: 7px 0; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  svg text { fill: var(--muted); font-size: 16px; font-family: var(--font-body); }
+
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: var(--sp-2) var(--sp-1); border-top: 1px solid var(--line); vertical-align: top; }
+  th { font-size: var(--fs-small); color: var(--muted); font-weight: 400; border-top: 0; }
+  #more { margin-top: var(--sp-3); }
+
+  .backup-buttons { margin-top: var(--sp-4); }
+  .backup-text p + p { margin-top: var(--sp-3); }
 </style>
 </head>
 <body>
 <main>
   <h1>週イチ体重</h1>
 
-  <section>
-    <p id="status"></p>
-    <form class="entry" id="entry-form">
-      <label class="kg">体重（kg）
-        <input id="kg" type="number" inputmode="decimal" step="0.1" min="20" max="400" required>
-      </label>
-      <label class="date">日付
-        <input id="date" type="date" required>
-      </label>
-      <button type="submit">記録</button>
-    </form>
-    <p id="message" role="status"></p>
-  </section>
-
-  <section>
-    <div class="stats" id="stats"></div>
-  </section>
-
-  <section>
-    <h2>推移</h2>
-    <div id="chart"></div>
-  </section>
-
-  <section>
-    <h2>これまでの記録</h2>
-    <ul id="history"></ul>
-  </section>
-
-  <section>
-    <details>
-      <summary>設定とバックアップ</summary>
-      <form class="row" id="settings-form">
-        <label>身長（cm）<input id="height" type="number" step="0.1" min="50" max="260"></label>
-        <label>目標体重（kg）<input id="goal" type="number" step="0.1" min="20" max="400"></label>
-        <button type="submit" class="sub">設定を保存</button>
-      </form>
-      <div class="row" style="margin-top:12px">
-        <button type="button" class="sub" id="export">バックアップを保存</button>
-        <button type="button" class="sub" id="import">バックアップを読み込む</button>
-        <input id="import-file" type="file" accept="application/json" hidden>
+  <section aria-labelledby="h-record">
+    <h2 id="h-record">記録</h2>
+    <p id="broken" class="error" role="alert" hidden>保存された記録を読み込めませんでした。記録は変更していません。バックアップがあれば読み込んでください。バックアップがない場合、この画面からは記録できません。</p>
+    <form id="entry-form" novalidate>
+      <div class="field">
+        <label for="kg">体重（kg）</label>
+        <input id="kg" type="text" inputmode="decimal" placeholder="例：62.4" autocomplete="off">
+        <p id="kg-error" class="field-error" role="alert" hidden></p>
       </div>
-      <p class="note">記録はこのブラウザの中だけに保存され、外部には送信されません。ブラウザのデータを消すと記録も消えるので、ときどきバックアップを保存してください。</p>
-    </details>
+      <div class="field">
+        <label for="date">記録する日</label>
+        <input id="date" type="date">
+        <p id="date-error" class="field-error" role="alert" hidden></p>
+      </div>
+      <button type="submit" class="primary" id="submit">記録する</button>
+    </form>
+    <p id="overwrite" class="notice" hidden></p>
+    <p id="save-error" class="error" role="alert" hidden></p>
+    <div id="done" class="done" role="status" aria-live="polite"></div>
+    <p class="note">週に1回、1つの数字を入れるだけです。同じ週にもう一度記録すると、その週の記録を上書きします。</p>
+    <p class="note">記録はこの端末のブラウザの中だけに保存されます。入力した内容は外部へ送信しません。</p>
+  </section>
+
+  <section id="numbers-section" aria-labelledby="h-numbers">
+    <h2 id="h-numbers">数字</h2>
+    <div id="numbers"></div>
+  </section>
+
+  <section id="chart-section" aria-labelledby="h-chart">
+    <h2 id="h-chart">推移</h2>
+    <div id="chart"></div>
+    <p id="chart-note" class="note" hidden></p>
+  </section>
+
+  <section id="history-section" aria-labelledby="h-history">
+    <h2 id="h-history">これまでの記録</h2>
+    <div id="history"></div>
+    <button type="button" class="secondary" id="more" hidden>さらに表示</button>
+  </section>
+
+  <section aria-labelledby="h-backup">
+    <h2 id="h-backup">バックアップと保存について</h2>
+    <div class="backup-text">
+      <p>記録は、この端末のブラウザの中だけに保存されています。ブラウザのデータを消したとき、端末が壊れたり買い替えたりしたとき、別のブラウザや別の端末で開いたときは、記録が消える、または見られなくなります。</p>
+      <p>消えないように、ときどきバックアップを保存してください。保存したファイルは、あなたの端末に残ります。</p>
+      <p>入力した体重や日付は、外部へ送信しません。</p>
+    </div>
+    <div class="backup-buttons">
+      <button type="button" class="primary" id="export">バックアップを保存</button>
+      <button type="button" class="secondary" id="import">バックアップを読み込む</button>
+      <input id="import-file" type="file" accept=".json,application/json" hidden>
+    </div>
+    <p id="last-backup" class="note"></p>
+    <p id="backup-status" class="notice" role="status" aria-live="polite"></p>
+    <div id="replace-panel" class="panel" hidden>
+      <p id="replace-text"></p>
+      <button type="button" class="primary" id="replace-yes">置き換える</button>
+      <button type="button" class="secondary" id="replace-no">やめる</button>
+    </div>
   </section>
 </main>
 
