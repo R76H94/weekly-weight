@@ -1,61 +1,399 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { addEntry, bmi, parseBackup, streak, summarize, weekOf } = require("./core.js");
+const { execFileSync } = require("node:child_process");
+const path = require("node:path");
+const core = require("./core.js");
 
-// All values in this file are made up for testing.
+// All weights and dates in this file are made up for testing.
 
-test("a week starts on Monday", () => {
-  assert.equal(weekOf("2026-11-01"), "2026-10-26"); // Sunday
-  assert.equal(weekOf("2026-11-02"), "2026-11-02"); // Monday
+const r = (date, kg) => ({ date, kg });
+
+function fakeStorage(initial = {}, { failGet = false, failSet = false } = {}) {
+  const data = { ...initial };
+  const calls = { get: [], set: [] };
+  return {
+    data,
+    calls,
+    getItem(key) {
+      calls.get.push(key);
+      if (failGet) throw new Error("blocked");
+      return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null;
+    },
+    setItem(key, value) {
+      calls.set.push(key);
+      if (failSet) throw new Error("quota");
+      data[key] = String(value);
+    },
+  };
+}
+
+// ---- weeks ----
+
+test("weeks start on Monday, across months, years and leap days", () => {
+  assert.equal(core.weekOf("2026-11-01"), "2026-10-26"); // Sunday
+  assert.equal(core.weekOf("2026-11-02"), "2026-11-02"); // Monday
+  assert.equal(core.weekOf("2026-11-08"), "2026-11-02"); // Sunday of the same week
+  assert.equal(core.weekOf("2027-01-01"), "2026-12-28"); // Friday, the week began last year
+  assert.equal(core.weekOf("2027-01-03"), "2026-12-28");
+  assert.equal(core.weekOf("2027-01-04"), "2027-01-04");
+  assert.equal(core.weekOf("2028-02-29"), "2028-02-28"); // leap day, Tuesday
+  assert.equal(core.weekOf("2028-03-05"), "2028-02-28");
+  assert.equal(core.isRealDate("2028-02-29"), true);
+  assert.equal(core.isRealDate("2027-02-29"), false);
+  assert.equal(core.isRealDate("2026-13-01"), false);
+  assert.equal(core.isRealDate("2026-11-2"), false);
+  assert.equal(core.isRealDate(""), false);
 });
 
-test("a second entry in a week replaces the first", () => {
-  let entries = addEntry([], { date: "2026-11-02", kg: 62.4 });
-  entries = addEntry(entries, { date: "2026-11-08", kg: 62.1 });
-  entries = addEntry(entries, { date: "2026-10-26", kg: 62.8 });
-  assert.deepEqual(entries, [
-    { date: "2026-10-26", kg: 62.8 },
-    { date: "2026-11-08", kg: 62.1 },
-  ]);
+test("results do not depend on the time zone", () => {
+  const script = `
+    const c = require(${JSON.stringify(path.join(__dirname, "core.js"))});
+    const rows = c.buildRows([{date:"2026-10-12",kg:63.0},{date:"2026-10-26",kg:62.9},{date:"2026-11-08",kg:62.7}]);
+    process.stdout.write(JSON.stringify([
+      c.weekOf("2026-11-01"), c.weekOf("2026-11-02"), c.weekOf("2027-01-03"), c.weekOf("2028-02-29"),
+      c.streak([{date:"2026-11-02",kg:62}], "2026-11-09"), rows.map(x => [x.week, x.diffTenths, x.gapWeeks]),
+      c.formatWeekRange("2026-12-28", "2027-01-05"),
+    ]));
+  `;
+  const zones = ["UTC", "Asia/Tokyo", "America/Los_Angeles", "Pacific/Kiritimati", "Pacific/Pago_Pago"];
+  const run = (tz, code) => execFileSync(process.execPath, ["-e", code], { env: { ...process.env, TZ: tz }, encoding: "utf8" });
+  // The zones really differ in the child processes.
+  const offsets = zones.map((tz) => run(tz, "process.stdout.write(String(new Date(2026, 10, 2).getTimezoneOffset()))"));
+  assert.equal(new Set(offsets).size, zones.length);
+  const outputs = zones.map((tz) => run(tz, script));
+  for (const output of outputs) assert.equal(output, outputs[0]);
+  assert.deepEqual(JSON.parse(outputs[0]).slice(0, 4), ["2026-10-26", "2026-11-02", "2026-12-28", "2028-02-28"]);
 });
 
-test("impossible values are refused", () => {
-  assert.throws(() => addEntry([], { date: "2026-13-01", kg: 62 }));
-  assert.throws(() => addEntry([], { date: "2026-02-30", kg: 62 }));
-  assert.throws(() => addEntry([], { date: "2026-11-01", kg: 5 }));
-  assert.throws(() => addEntry([], { date: "2026-11-01", kg: Number.NaN }));
+// ---- input ----
+
+test("weight input is normalized and checked in order", () => {
+  assert.deepEqual(core.parseKgInput("62.4"), { ok: true, kg: 62.4 });
+  assert.deepEqual(core.parseKgInput("６２．４"), { ok: true, kg: 62.4 });
+  assert.deepEqual(core.parseKgInput("62,4"), { ok: true, kg: 62.4 });
+  assert.deepEqual(core.parseKgInput(" 62 "), { ok: true, kg: 62 });
+  assert.deepEqual(core.parseKgInput("20"), { ok: true, kg: 20 });
+  assert.deepEqual(core.parseKgInput("400.0"), { ok: true, kg: 400 });
+  assert.equal(core.parseKgInput("").error, "EMPTY");
+  assert.equal(core.parseKgInput("　 ").error, "EMPTY");
+  assert.equal(core.parseKgInput("abc").error, "NOT_NUMBER");
+  assert.equal(core.parseKgInput("62.").error, "NOT_NUMBER");
+  assert.equal(core.parseKgInput("62.4x").error, "NOT_NUMBER");
+  assert.equal(core.parseKgInput("62.45").error, "DECIMALS");
+  assert.equal(core.parseKgInput("500.45").error, "DECIMALS"); // decimals are checked before range
+  assert.equal(core.parseKgInput("19.9").error, "RANGE");
+  assert.equal(core.parseKgInput("400.1").error, "RANGE");
+  assert.equal(core.parseKgInput("-62").error, "RANGE");
 });
 
-test("the streak survives an unentered current week and stops at a gap", () => {
-  const entries = [
-    { date: "2026-10-05", kg: 63.0 },
-    { date: "2026-10-19", kg: 62.6 },
-    { date: "2026-10-26", kg: 62.5 },
+test("dates must be present and not in the future", () => {
+  assert.equal(core.checkDate("", "2026-11-02").error, "EMPTY");
+  assert.equal(core.checkDate("2026-02-30", "2026-11-02").error, "EMPTY");
+  assert.equal(core.checkDate("2026-11-03", "2026-11-02").error, "FUTURE");
+  assert.equal(core.checkDate("2026-11-02", "2026-11-02").ok, true);
+  assert.equal(core.checkDate("2020-01-06", "2026-11-02").ok, true);
+});
+
+// ---- records and differences ----
+
+test("a second record in a week replaces the first, without changing the input", () => {
+  const before = [r("2026-10-26", 62.8)];
+  let records = core.upsertRecord(before, r("2026-11-03", 62.4));
+  records = core.upsertRecord(records, r("2026-11-08", 62.1));
+  assert.deepEqual(records, [r("2026-10-26", 62.8), r("2026-11-08", 62.1)]);
+  assert.deepEqual(before, [r("2026-10-26", 62.8)]);
+  assert.deepEqual(core.findSameWeek(records, "2026-11-02"), r("2026-11-08", 62.1));
+  assert.equal(core.findSameWeek(records, "2026-10-19"), null);
+  assert.equal(core.findSameWeek(records, ""), null);
+});
+
+test("rows follow the design example, including a skipped week", () => {
+  const rows = core.buildRows([r("2026-11-02", 62.7), r("2026-10-12", 63.0), r("2026-10-26", 62.9)]);
+  assert.deepEqual(
+    rows.map((row) => [row.week, row.diffTenths, row.gapWeeks, row.startDiffTenths]),
+    [
+      ["2026-10-12", null, null, null],
+      ["2026-10-26", -1, 2, -1],
+      ["2026-11-02", -2, 1, -3],
+    ],
+  );
+  assert.deepEqual(rows[2].previous, { week: "2026-10-26", kg: 62.9 });
+});
+
+test("differences are exact to 0.1 kg", () => {
+  // 62.3 - 62.0 is not exactly 0.3 in floating point.
+  assert.notEqual(62.3 - 62.0, 0.3);
+  const rows = core.buildRows([r("2026-10-05", 62.0), r("2026-10-12", 62.3), r("2026-10-19", 62.3)]);
+  assert.equal(rows[1].diffTenths, 3);
+  assert.equal(rows[2].diffTenths, 0);
+  assert.equal(core.formatDiff(rows[1].diffTenths), "+0.3");
+  assert.equal(core.formatDiff(rows[2].diffTenths), "±0.0");
+  assert.equal(core.formatDiff(-2), "−0.2");
+  assert.equal(core.formatDiff(-15), "−1.5");
+  assert.equal(core.spokenDiff("前回との差", -2), "前回との差 マイナス 0.2 キログラム");
+  assert.equal(core.spokenDiff("開始からの差", 4), "開始からの差 プラス 0.4 キログラム");
+  assert.equal(core.formatKg(63), "63.0 kg");
+});
+
+test("overwriting the oldest week changes every start difference", () => {
+  let records = [r("2026-10-05", 63.2), r("2026-10-12", 62.8), r("2026-10-19", 62.5)];
+  assert.deepEqual(core.buildRows(records).map((row) => row.startDiffTenths), [null, -4, -7]);
+  records = core.upsertRecord(records, r("2026-10-07", 62.6));
+  const rows = core.buildRows(records);
+  assert.equal(records.length, 3);
+  assert.deepEqual(rows.map((row) => row.startDiffTenths), [null, 2, -1]);
+  assert.deepEqual(rows.map((row) => row.diffTenths), [null, 2, -3]);
+});
+
+test("streak counts from the latest record's week", () => {
+  const records = [r("2026-10-12", 63.0), r("2026-10-26", 62.9), r("2026-11-02", 62.7)];
+  assert.equal(core.streak(records, "2026-11-02"), 2); // design example
+  assert.equal(core.streak(records, "2026-11-15"), 2); // last week counts, this week is not over
+  assert.equal(core.streak(records, "2026-11-16"), null); // two weeks ago
+  assert.equal(core.streak([r("2026-11-04", 62.0)], "2026-11-05"), 1);
+  assert.equal(core.streak([r("2026-10-05", 62.0)], "2026-11-05"), null); // one old record gives "—"
+  assert.equal(core.streak([], "2026-11-05"), null);
+  const run = [r("2026-12-21", 62.4), r("2026-12-28", 62.3), r("2027-01-04", 62.5)];
+  assert.equal(core.streak(run, "2027-01-06"), 3); // across the new year
+});
+
+test("summary gives what the cards need", () => {
+  const empty = core.summarize([], "2026-11-02");
+  assert.equal(empty.count, 0);
+  assert.equal(empty.latest, null);
+  const one = core.summarize([r("2026-11-02", 62.7)], "2026-11-02");
+  assert.equal(one.count, 1);
+  assert.equal(one.latest.diffTenths, null);
+  assert.equal(one.latest.startDiffTenths, null);
+  assert.equal(one.streak, 1);
+  const many = core.summarize([r("2026-10-12", 63.0), r("2026-10-26", 62.9), r("2026-11-02", 62.7)], "2026-11-02");
+  assert.equal(many.latest.diffTenths, -2);
+  assert.equal(many.latest.startDiffTenths, -3);
+  assert.equal(many.start.week, "2026-10-12");
+});
+
+// ---- year display ----
+
+test("the year is written only when it is not this year", () => {
+  assert.equal(core.formatWeekLabel("2026-11-02", "2026-11-05"), "11月2日の週");
+  assert.equal(core.formatWeekLabel("2026-12-28", "2027-01-05"), "2026年12月28日の週");
+  assert.equal(core.formatWeekLabel("2026-12-28", "2026-12-30"), "12月28日の週");
+  assert.equal(core.formatWeekLabel("2026-12-28", "2027-01-02"), "2026年12月28日の週"); // judged by Monday
+  assert.equal(core.formatWeekLabelWithDay("2026-11-02", "2026-11-05"), "11月2日（月）の週");
+  assert.equal(core.formatWeekLabelWithDay("2025-11-03", "2026-11-05"), "2025年11月3日（月）の週");
+  assert.equal(core.formatDate("2027-01-01", "2027-01-05"), "1月1日"); // a single date uses its own year
+  assert.equal(core.formatDate("2026-12-31", "2027-01-05"), "2026年12月31日");
+  assert.equal(core.formatWeekRange("2026-11-02", "2026-11-05"), "11月2日〜8日");
+  assert.equal(core.formatWeekRange("2026-10-26", "2026-11-05"), "10月26日〜11月1日");
+  assert.equal(core.formatWeekRange("2026-12-28", "2026-12-30"), "12月28日〜1月3日");
+  assert.equal(core.formatWeekRange("2026-12-28", "2027-01-05"), "2026年12月28日〜2027年1月3日");
+  assert.equal(core.formatWeekRange("2025-11-03", "2026-11-05"), "2025年11月3日〜9日");
+});
+
+// ---- chart ----
+
+test("chart axis follows the 2 kg minimum with the extra 0.1 kg on top", () => {
+  const model = core.chartModel([r("2026-10-12", 63.0), r("2026-10-26", 62.9), r("2026-11-02", 62.7)], "2026-11-02");
+  assert.equal(model.yTop, "63.9");
+  assert.equal(model.yBottom, "61.9");
+  assert.equal(model.xFirst, "10月12日");
+  assert.equal(model.xLast, "11月2日");
+  assert.equal(model.truncated, false);
+  assert.equal(model.label, "体重の推移。10月12日の週 63.0 kg から、11月2日の週 62.7 kg まで、3件の記録");
+  // Weeks are evenly spaced, and the skipped week still takes its width.
+  const [a, b, c] = model.points;
+  assert.ok(Math.abs(b.x - a.x - 2 * (c.x - b.x)) < 0.05);
+  assert.equal(a.x, model.plot.left);
+  assert.equal(c.x, model.plot.right);
+  assert.deepEqual(model.points.map((p) => p.latest), [false, false, true]);
+});
+
+test("chart axis keeps the 0.5 kg margin when the range is already wide", () => {
+  const model = core.chartModel([r("2026-10-05", 64.0), r("2026-10-12", 61.0)], "2026-11-02");
+  assert.equal(model.yTop, "64.5");
+  assert.equal(model.yBottom, "60.5");
+});
+
+test("chart with one record puts the point in the middle", () => {
+  const model = core.chartModel([r("2026-11-02", 62.7)], "2026-11-02");
+  assert.equal(model.points.length, 1);
+  assert.equal(model.points[0].x, (model.plot.left + model.plot.right) / 2);
+  assert.equal(model.yTop, "63.7");
+  assert.equal(model.yBottom, "61.7");
+  assert.equal(model.label, "体重の推移。11月2日の週 62.7 kg、1件の記録");
+  assert.equal(core.chartModel([], "2026-11-02"), null);
+});
+
+test("chart shows the last 52 weeks counted from the latest record", () => {
+  const records = [];
+  for (let i = 0; i < 53; i++) {
+    const date = new Date(Date.UTC(2025, 10, 3) + i * 7 * 86400000).toISOString().slice(0, 10);
+    records.push(r(date, 62 + (i % 5) / 10));
+  }
+  const model = core.chartModel(records, "2026-11-20");
+  assert.equal(model.points.length, 52);
+  assert.equal(model.truncated, true);
+  assert.equal(model.points[0].week, "2025-11-10");
+  assert.equal(model.xFirst, "2025年11月10日");
+  assert.equal(model.xLast, "11月2日");
+  const exact = core.chartModel(records.slice(1), "2026-11-20");
+  assert.equal(exact.truncated, false);
+});
+
+// ---- backup ----
+
+const TODAY = "2026-11-02";
+const backup = (fields) => JSON.stringify({ app: "weekly-weight", version: 1, exportedAt: "x", ...fields });
+
+test("a backup round-trips and has only the four fields", () => {
+  const records = [r("2026-10-12", 63), r("2026-10-26", 62.9)];
+  const text = core.buildBackup(records, new Date(2026, 10, 2, 20, 15, 0));
+  const data = JSON.parse(text);
+  assert.deepEqual(Object.keys(data), ["app", "version", "exportedAt", "records"]);
+  assert.match(data.exportedAt, /^2026-11-02T20:15:00[+-]\d{2}:\d{2}$/);
+  assert.deepEqual(core.parseBackup(text, TODAY), { ok: true, records });
+  assert.equal(core.backupFileName(TODAY), "weekly-weight-2026-11-02.json");
+});
+
+test("backup check: unreadable", () => {
+  assert.deepEqual(core.parseBackup("not json", TODAY), { ok: false, error: "UNREADABLE" });
+  const big = backup({ records: [r("2026-10-12", 63)], pad: "x".repeat(1024 * 1024) });
+  assert.deepEqual(core.parseBackup(big, TODAY), { ok: false, error: "UNREADABLE" });
+});
+
+test("backup check: wrong format or version", () => {
+  const wrong = (text) => assert.deepEqual(core.parseBackup(text, TODAY), { ok: false, error: "WRONG_FORMAT" });
+  wrong("[]");
+  wrong("null");
+  wrong("62");
+  wrong(backup({ app: "other", records: [r("2026-10-12", 63)] }));
+  wrong(backup({ version: 2, records: [r("2026-10-12", 63)] }));
+  wrong(backup({ version: "1", records: [r("2026-10-12", 63)] }));
+  wrong(backup({ records: "none" }));
+  wrong(backup({}));
+  wrong(backup({ records: [] }));
+  // The prototype's format is not accepted.
+  wrong(JSON.stringify({ entries: [r("2026-10-12", 63)], settings: {} }));
+  const many = [];
+  for (let i = 0; i < 5001; i++) many.push(r("2026-10-12", 63));
+  wrong(backup({ records: many }));
+});
+
+test("backup check: a bad record reports its position in the file, before sorting", () => {
+  const bad = (record, at = 2) => {
+    const records = [r("2026-10-26", 62.9), r("2026-10-12", 63.0), r("2026-10-05", 63.1)];
+    records.splice(at - 1, 0, record);
+    assert.deepEqual(core.parseBackup(backup({ records }), TODAY), { ok: false, error: "BAD_RECORD", index: at });
+  };
+  bad(r("2026-02-30", 62.4));
+  bad(r("2026/10/19", 62.4));
+  bad(r("2026-11-03", 62.4)); // future
+  bad(r("2026-10-19", "62.4"));
+  bad(r("2026-10-19", 62.45));
+  bad(r("2026-10-19", 19.9));
+  bad(r("2026-10-19", 400.1));
+  bad(r("2026-10-19", null));
+  bad(null, 4);
+  bad([], 1);
+  bad({ date: "2026-10-19" });
+});
+
+test("backup check: two records in one week", () => {
+  const text = backup({ records: [r("2026-10-12", 63.0), r("2026-10-26", 62.9), r("2026-10-18", 62.8)] });
+  assert.deepEqual(core.parseBackup(text, TODAY), { ok: false, error: "DUPLICATE_WEEK" });
+});
+
+test("backup check: accepted files are sorted and unknown fields dropped", () => {
+  const text = backup({
+    extra: true,
+    records: [{ date: "2026-10-26", kg: 62.9, note: "x" }, r("2026-10-12", 63), r("2026-11-02", 400)],
+  });
+  assert.deepEqual(core.parseBackup(text, TODAY), {
+    ok: true,
+    records: [r("2026-10-12", 63), r("2026-10-26", 62.9), r("2026-11-02", 400)],
+  });
+  const full = [];
+  for (let i = 0; i < 5000; i++) {
+    full.push(r(new Date(Date.UTC(2026, 9, 26) - i * 7 * 86400000).toISOString().slice(0, 10), 62.5));
+  }
+  const result = core.parseBackup(backup({ records: full }), TODAY);
+  assert.equal(result.ok, true);
+  assert.equal(result.records.length, 5000);
+});
+
+// ---- storage ----
+
+const KEY = core.STORAGE_KEY;
+const saved = (records) => JSON.stringify({ version: 1, records });
+
+test("loading: missing key is zero records, the prototype key is not read", () => {
+  const storage = fakeStorage({ "weekly-weight": '{"entries":[]}' });
+  assert.deepEqual(core.loadRecords(storage, TODAY), { state: "empty", records: [] });
+  assert.deepEqual(storage.calls.get, [KEY]);
+  assert.deepEqual(storage.calls.set, []);
+  assert.equal(KEY, "weekly-weight-v1");
+});
+
+test("loading: valid data", () => {
+  const storage = fakeStorage({ [KEY]: saved([r("2026-10-26", 62.9), r("2026-10-12", 63.0)]) });
+  assert.deepEqual(core.loadRecords(storage, TODAY), {
+    state: "ok",
+    records: [r("2026-10-12", 63.0), r("2026-10-26", 62.9)],
+  });
+});
+
+test("loading: broken data is reported and never written", () => {
+  const cases = [
+    "{oops",
+    "[]",
+    JSON.stringify({ version: 2, records: [r("2026-10-12", 63)] }),
+    saved([]),
+    saved([r("2026-10-12", 63), r("2026-10-13", 62.9)]),
+    saved([r("2026-10-12", "63")]),
   ];
-  assert.equal(streak(entries, "2026-11-01"), 2);
-  assert.equal(streak(entries, "2026-11-03"), 2);
-  assert.equal(streak(entries, "2026-11-10"), 0);
-  assert.equal(streak([], "2026-11-01"), 0);
+  for (const text of cases) {
+    const storage = fakeStorage({ [KEY]: text });
+    assert.deepEqual(core.loadRecords(storage, TODAY), { state: "broken" });
+    assert.equal(storage.data[KEY], text);
+    assert.deepEqual(storage.calls.set, []);
+  }
+  assert.deepEqual(core.loadRecords(fakeStorage({}, { failGet: true }), TODAY), { state: "broken" });
+  assert.deepEqual(core.loadRecords(null, TODAY), { state: "broken" });
 });
 
-test("the summary reports progress", () => {
-  const entries = [
-    { date: "2026-10-26", kg: 62.5 },
-    { date: "2026-11-08", kg: 62.0 },
-  ];
-  const summary = summarize(entries, "2026-11-08", { heightCm: 165, goalKg: 60 });
-  assert.equal(summary.isDoneThisWeek, true);
-  assert.ok(Math.abs(summary.change + 0.5) < 1e-9);
-  assert.equal(summary.toGoal, 2);
-  assert.ok(Math.abs(bmi(62.5, 165) - 22.96) < 0.01);
-  assert.equal(summarize([], "2026-11-08", {}).latest, null);
+test("broken saved data stays byte for byte until the replacement is confirmed", () => {
+  const original = '{"version":1,"records":[{"date":"2026-10-12","kg":"x"}]';
+  const storage = fakeStorage({ [KEY]: original, other: "keep" });
+  assert.equal(core.loadRecords(storage, TODAY).state, "broken");
+  const file = core.parseBackup(backup({ records: [r("2026-10-12", 63.0), r("2026-10-19", 62.6)] }), TODAY);
+  assert.equal(file.ok, true);
+  assert.equal(core.loadRecords(storage, TODAY).state, "broken"); // reloading before confirming
+  assert.equal(storage.data[KEY], original);
+  assert.deepEqual(storage.calls.set, []);
+  // Confirming is the only write.
+  assert.equal(core.saveRecords(storage, file.records), true);
+  assert.deepEqual(storage.calls.set, [KEY]);
+  assert.deepEqual(core.loadRecords(storage, TODAY), { state: "ok", records: file.records });
+  assert.equal(storage.data.other, "keep");
 });
 
-test("a bad backup is refused as a whole", () => {
-  assert.throws(() => parseBackup('{"entries":[{"date":"2026-11-01","kg":"重い"}]}'));
-  assert.throws(() => parseBackup("not json"));
-  const good = parseBackup('{"entries":[{"date":"2026-11-01","kg":62}],"settings":{"heightCm":160}}');
-  assert.equal(good.entries.length, 1);
-  assert.equal(good.settings.heightCm, 160);
-  assert.equal(good.settings.goalKg, null);
+test("a failed save reports failure and leaves the stored data as it was", () => {
+  const before = saved([r("2026-10-12", 63.0)]);
+  const storage = fakeStorage({ [KEY]: before }, { failSet: true });
+  assert.equal(core.saveRecords(storage, [r("2026-10-12", 63.0), r("2026-10-19", 62.6)]), false);
+  assert.equal(storage.data[KEY], before);
+  assert.equal(core.saveRecords(null, []), false);
+  assert.equal(core.saveRecords(fakeStorage(), [r("2026-10-12", 63.0)]), true);
+});
+
+test("the last backup date is kept apart from the records", () => {
+  const storage = fakeStorage();
+  assert.equal(core.loadLastBackup(storage), null);
+  assert.equal(core.saveLastBackup(storage, TODAY), true);
+  assert.equal(core.loadLastBackup(storage), TODAY);
+  assert.equal(storage.data[core.LAST_BACKUP_KEY], TODAY);
+  assert.equal(storage.data[KEY], undefined);
+  assert.equal(core.loadLastBackup(fakeStorage({ [core.LAST_BACKUP_KEY]: "nonsense" })), null);
+  assert.equal(core.saveLastBackup(fakeStorage({}, { failSet: true }), TODAY), false);
+  assert.equal(core.loadLastBackup(null), null);
 });
