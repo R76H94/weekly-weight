@@ -184,3 +184,83 @@ test("number cards choose their columns by text size and never break inside a nu
   assert.ok(!/@media \(min-width: 480px\)/.test(html), "no fixed 480 px breakpoint for the cards");
   assert.match(html, /\.card \.value \{[^}]*overflow-wrap: normal;[^}]*\}/);
 });
+
+// ---- design 8 (2026-11-03) ----
+
+const core = require("./core.js");
+
+// Every new text, built from the real functions with made-up values.
+function newTexts() {
+  const records = [{ date: "2026-10-26", kg: 62.9 }, { date: "2026-11-03", kg: 62.7 }];
+  return [
+    core.weekNoticeText("2026-11-04", "2026-11-09"),
+    core.weekNoticeText("2026-12-31", "2027-01-05"),
+    core.overwriteNoticeText(records, "2026-11-08", "2026-11-09"),
+    core.overwriteDoneText("2026-11-04", 62.9, 62.7, "2026-11-09"),
+    core.overwriteDoneText("2027-01-02", 63.1, 63.1, "2027-01-05"),
+    core.HISTORY_HINT,
+  ];
+}
+
+test("the new texts have no banned words, no judging words and no promise of removing", () => {
+  for (const text of newTexts()) {
+    assert.equal(typeof text, "string");
+    for (const word of BANNED_WORDS) assert.ok(!text.includes(word), `${text} contains ${word}`);
+    // 8-B: facts only. 8-C: nothing can be removed or undone.
+    for (const word of ["更新しました", "変わりました", "消せます", "削除", "取り消し", "編集", "修正"]) {
+      assert.ok(!text.includes(word), `${text} contains ${word}`);
+    }
+  }
+});
+
+test("the week line sits under the date field (and its error), before the button", () => {
+  const html = sources["index.html"];
+  const date = html.indexOf('<input id="date"');
+  const error = html.indexOf('id="date-error"');
+  const week = html.indexOf('<p id="week-notice"');
+  const button = html.indexOf('id="submit"');
+  assert.ok(date < error && error < week && week < button);
+  // No aria-live: it would be read again for every day stepped through.
+  assert.match(html, /<p id="week-notice" class="week-notice" hidden><\/p>/);
+  const app = sources["app.js"];
+  assert.ok(app.includes("C.weekNoticeText(dateInput.value, today())"));
+  assert.ok(app.includes("C.dateDescribedBy({"));
+});
+
+test("the overwrite notice is a polite status, shown from the start and while typing", () => {
+  const html = sources["index.html"];
+  assert.match(html, /<p id="overwrite" class="notice" role="status" aria-live="polite" hidden><\/p>/);
+  const app = sources["app.js"];
+  // Not while the confirmation after recording is shown.
+  assert.ok(app.includes('const done = $("done").childElementCount > 0;'));
+  // Typing in the weight field brings it back, so Enter users see it before sending.
+  const typing = app.slice(app.indexOf('kgInput.addEventListener("input"'));
+  assert.ok(typing.indexOf("updateOverwriteNotice();") < typing.indexOf("});"));
+  // render() (start, after import and after starting over) updates both lines.
+  const render = app.slice(app.indexOf("function render()"), app.indexOf("// ---- recording ----"));
+  assert.ok(render.includes("updateWeekNotice();") && render.includes("updateOverwriteNotice();"));
+  // After recording: the confirmation is filled before render(), so the notice stays hidden.
+  const submit = app.slice(app.indexOf('$("entry-form").addEventListener("submit"'));
+  assert.ok(submit.indexOf("C.overwriteDoneText(date, existing.kg, kg.kg, t)") > 0);
+  assert.ok(submit.indexOf('$("done").replaceChildren(...nodes);') < submit.indexOf("render();"));
+  assert.ok(submit.indexOf("const existing = C.findSameWeek(records, date);") < submit.indexOf("C.upsertRecord("));
+});
+
+test("the history hint is above the table and describes it", () => {
+  const html = sources["index.html"];
+  const head = html.indexOf('<h2 id="h-history">');
+  const hint = html.indexOf('<p id="history-hint"');
+  const table = html.indexOf('<div id="history">');
+  assert.ok(head < hint && hint < table);
+  const app = sources["app.js"];
+  assert.ok(app.includes('show($("history-hint"), C.HISTORY_HINT);'));
+  assert.ok(app.includes('el("table", { "aria-describedby": "history-hint" })'));
+  assert.ok(!/id="(delete|edit|remove)/.test(html), "no delete or edit buttons");
+});
+
+test("the last backup line is right under the backup heading, once, in body text size", () => {
+  const html = sources["index.html"];
+  assert.match(html, /<h2 id="h-backup">バックアップと保存について<\/h2>\s*<p id="last-backup" class="last-backup"><\/p>\s*<div class="backup-text">/);
+  assert.equal(html.match(/id="last-backup"/g).length, 1);
+  assert.ok(!/\.last-backup \{[^}]*(font-size|font-weight|color)/.test(html), "same size and colour as the body");
+});

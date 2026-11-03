@@ -216,6 +216,40 @@
     return `次の記録は、${formatWeekLabelWithDay(week, today)}${thisWeek}です。`;
   }
 
+  // ---- texts around the form (design 8, A and B) ----
+
+  // The line under the date field: which week the date belongs to. null when the
+  // date is empty, not a real day, or after today (no line; the error says why on submit).
+  function weekNoticeText(date, today) {
+    if (!isRealDate(date) || !isRealDate(today) || date > today) return null;
+    return `この日付は${formatWeekLabelWithDay(weekOf(date), today)}の記録になります。`;
+  }
+
+  // Before recording: the week of the date already has a record. null when it has not.
+  function overwriteNoticeText(records, date, today) {
+    const existing = findSameWeek(records, date);
+    if (!existing) return null;
+    return `この週（${formatWeekRange(weekOf(existing.date), today)}）には ${formatKg(existing.kg)} の記録があります。記録すると上書きします。`;
+  }
+
+  // After recording over a week: the old and the new value, as a fact only.
+  // The same sentence is used when both values are equal.
+  function overwriteDoneText(date, oldKg, newKg, today) {
+    return `${formatWeekRange(weekOf(date), today)}の週の記録を ${formatKg(oldKg)} から ${formatKg(newKg)} に上書きしました。`;
+  }
+
+  // Above the history table. Says how to fix a week; nothing can be removed.
+  const HISTORY_HINT = "同じ週の記録は、もう一度記録すると直せます。";
+
+  // aria-describedby of the date field: the week line, the overwrite notice, then the error.
+  function dateDescribedBy(shown) {
+    const ids = [];
+    if (shown.week) ids.push("week-notice");
+    if (shown.overwrite) ids.push("overwrite");
+    if (shown.error) ids.push("date-error");
+    return ids.join(" ");
+  }
+
   // Shown under "—" while there is only one record.
   const ONE_RECORD_NOTE = "次の週にもう1回記録すると、差が出ます";
 
@@ -510,7 +544,7 @@
     }
   }
 
-  // The line under the backup buttons. Returns null (no line) when the storage is
+  // The line right under the backup heading. Returns null (no line) when the storage is
   // "unavailable"; in that state the last-backup key is not read at all.
   function lastBackupText(loadState, storage, today) {
     if (loadState === "unavailable") return null;
@@ -544,6 +578,11 @@
     nextRecordWeek,
     nextRecordText,
     ONE_RECORD_NOTE,
+    weekNoticeText,
+    overwriteNoticeText,
+    overwriteDoneText,
+    HISTORY_HINT,
+    dateDescribedBy,
     weekOf,
     isRealDate,
     parseKgInput,

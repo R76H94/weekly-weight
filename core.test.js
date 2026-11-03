@@ -58,6 +58,7 @@ test("results do not depend on the time zone", () => {
       c.weekOf("2026-11-01"), c.weekOf("2026-11-02"), c.weekOf("2027-01-03"), c.weekOf("2028-02-29"),
       c.streak([{date:"2026-11-02",kg:62}], "2026-11-09"), rows.map(x => [x.week, x.diffTenths, x.gapWeeks]),
       c.formatWeekRange("2026-12-28", "2027-01-05"),
+      c.weekNoticeText("2026-11-08", "2026-11-09"), c.weekNoticeText("2026-12-31", "2027-01-05"),
     ]));
   `;
   const zones = ["UTC", "Asia/Tokyo", "America/Los_Angeles", "Pacific/Kiritimati", "Pacific/Pago_Pago"];
@@ -638,4 +639,103 @@ test("last backup line: hidden and the key not read only when storage is unavail
   assert.equal(core.lastBackupText("unavailable", blocked, TODAY), null);
   assert.deepEqual(blocked.calls, { get: [], set: [], remove: [] });
   assert.equal(core.lastBackupText("unavailable", null, TODAY), null);
+});
+
+// ---- design 8 (2026-11-03): the week line, the overwrite texts, the history hint ----
+
+test("week line under the date: the Monday of the date's week, with （月）", () => {
+  const t = "2026-11-09";
+  assert.equal(core.weekNoticeText("2026-11-02", t), "この日付は11月2日（月）から始まる週の記録になります。"); // Monday
+  assert.equal(core.weekNoticeText("2026-11-04", t), "この日付は11月2日（月）から始まる週の記録になります。"); // Wednesday
+  assert.equal(core.weekNoticeText("2026-11-08", t), "この日付は11月2日（月）から始まる週の記録になります。"); // Sunday
+  assert.equal(core.weekNoticeText("2026-11-09", t), "この日付は11月9日（月）から始まる週の記録になります。"); // today
+  assert.equal(core.weekNoticeText("2026-11-01", t), "この日付は10月26日（月）から始まる週の記録になります。"); // across months
+  assert.equal(core.weekNoticeText("2028-03-01", "2028-03-01"), "この日付は2月28日（月）から始まる週の記録になります。"); // leap year
+});
+
+test("week line: the year is written when the Monday is not in this year", () => {
+  // The Monday's year decides, even when the date itself is in this year.
+  assert.equal(core.weekNoticeText("2027-01-03", "2027-01-05"), "この日付は2026年12月28日（月）から始まる週の記録になります。");
+  assert.equal(core.weekNoticeText("2026-12-31", "2027-01-05"), "この日付は2026年12月28日（月）から始まる週の記録になります。");
+  assert.equal(core.weekNoticeText("2026-12-31", "2026-12-31"), "この日付は12月28日（月）から始まる週の記録になります。");
+  assert.equal(core.weekNoticeText("2027-01-04", "2027-01-05"), "この日付は1月4日（月）から始まる週の記録になります。");
+});
+
+test("week line: no line for an empty, unreal or future date", () => {
+  for (const date of ["", null, undefined, "2026-02-30", "2026-13-01", "abc"]) {
+    assert.equal(core.weekNoticeText(date, "2026-11-09"), null, String(date));
+  }
+  assert.equal(core.weekNoticeText("2026-11-10", "2026-11-09"), null);
+});
+
+test("week line: the same in every time zone", () => {
+  const script = `
+    const c = require(${JSON.stringify(path.join(__dirname, "core.js"))});
+    process.stdout.write(JSON.stringify([c.weekNoticeText("2026-11-08", "2026-11-09"), c.weekNoticeText("2026-12-31", "2027-01-05")]));
+  `;
+  for (const tz of ["UTC", "Asia/Tokyo", "America/Los_Angeles", "Pacific/Kiritimati", "Pacific/Pago_Pago"]) {
+    const out = execFileSync(process.execPath, ["-e", script], { env: { ...process.env, TZ: tz }, encoding: "utf8" });
+    assert.deepEqual(
+      JSON.parse(out),
+      ["この日付は11月2日（月）から始まる週の記録になります。", "この日付は2026年12月28日（月）から始まる週の記録になります。"],
+      tz,
+    );
+  }
+});
+
+test("overwrite notice before recording: the existing record of the date's week, or nothing", () => {
+  const records = [r("2026-10-26", 62.9), r("2026-11-03", 62.7)];
+  assert.equal(
+    core.overwriteNoticeText(records, "2026-11-08", "2026-11-09"),
+    "この週（11月2日〜8日）には 62.7 kg の記録があります。記録すると上書きします。",
+  );
+  assert.equal(core.overwriteNoticeText(records, "2026-11-09", "2026-11-09"), null);
+  assert.equal(core.overwriteNoticeText(records, "", "2026-11-09"), null);
+  assert.equal(core.overwriteNoticeText([], "2026-11-08", "2026-11-09"), null);
+  assert.equal(
+    core.overwriteNoticeText([r("2026-12-29", 63.0)], "2027-01-03", "2027-01-05"),
+    "この週（2026年12月28日〜2027年1月3日）には 63.0 kg の記録があります。記録すると上書きします。",
+  );
+});
+
+test("overwrite line after recording: the old and the new value, the old one taken before upsert", () => {
+  const records = [r("2026-10-26", 62.9), r("2026-11-03", 62.9)];
+  const typed = core.parseKgInput("62,7");
+  const existing = core.findSameWeek(records, "2026-11-05");
+  const next = core.upsertRecord(records, { date: "2026-11-05", kg: typed.kg });
+  // upsertRecord does not change the record the old value is read from.
+  assert.deepEqual(existing, r("2026-11-03", 62.9));
+  assert.deepEqual(core.findSameWeek(next, "2026-11-05"), r("2026-11-05", 62.7));
+  assert.equal(
+    core.overwriteDoneText("2026-11-05", existing.kg, typed.kg, "2026-11-09"),
+    "11月2日〜8日の週の記録を 62.9 kg から 62.7 kg に上書きしました。",
+  );
+});
+
+test("overwrite line after recording: same values, whole numbers and a year-crossing week", () => {
+  assert.equal(
+    core.overwriteDoneText("2026-11-02", 62.7, 62.7, "2026-11-09"),
+    "11月2日〜8日の週の記録を 62.7 kg から 62.7 kg に上書きしました。",
+  );
+  assert.equal(
+    core.overwriteDoneText("2026-11-02", 63, 64, "2026-11-09"),
+    "11月2日〜8日の週の記録を 63.0 kg から 64.0 kg に上書きしました。",
+  );
+  assert.equal(
+    core.overwriteDoneText("2027-01-02", 63.1, 63.0, "2027-01-05"),
+    "2026年12月28日〜2027年1月3日の週の記録を 63.1 kg から 63.0 kg に上書きしました。",
+  );
+  assert.equal(
+    core.overwriteDoneText("2026-10-30", 62.9, 62.8, "2026-11-09"),
+    "10月26日〜11月1日の週の記録を 62.9 kg から 62.8 kg に上書きしました。",
+  );
+});
+
+test("the history hint and the date field's description order", () => {
+  assert.equal(core.HISTORY_HINT, "同じ週の記録は、もう一度記録すると直せます。");
+  assert.equal(core.dateDescribedBy({ week: true, overwrite: true, error: true }), "week-notice overwrite date-error");
+  assert.equal(core.dateDescribedBy({ week: true, overwrite: false, error: false }), "week-notice");
+  assert.equal(core.dateDescribedBy({ week: false, overwrite: true, error: true }), "overwrite date-error");
+  assert.equal(core.dateDescribedBy({ week: false, overwrite: false, error: true }), "date-error");
+  assert.equal(core.dateDescribedBy({ week: false, overwrite: false, error: false }), "");
 });

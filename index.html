@@ -148,6 +148,14 @@
   #more, #discard { margin-top: var(--sp-3); }
   #discard-panel { margin-bottom: var(--sp-3); }
 
+  /* Design 8-A: right under the date field (under the error when there is one). */
+  .week-notice { margin-top: var(--sp-1); }
+  /* Design 8-C: above the history table, in the quiet style. */
+  .history-hint { color: var(--muted); font-size: var(--fs-small); margin-bottom: var(--sp-2); }
+  /* Design 8-E: right under the backup heading, the same size as the body text. */
+  #h-backup { margin-bottom: var(--sp-2); }
+  .last-backup + .backup-text { margin-top: var(--sp-3); }
+
   .backup-buttons { margin-top: var(--sp-4); }
   .backup-text > * + * { margin-top: var(--sp-3); }
   .steps { margin: 0; padding-left: 1.5em; }
@@ -177,10 +185,11 @@
         <label for="date">記録する日</label>
         <input id="date" type="date">
         <p id="date-error" class="field-error" role="alert" hidden></p>
+        <p id="week-notice" class="week-notice" hidden></p>
       </div>
       <button type="submit" class="primary" id="submit">記録する</button>
     </form>
-    <p id="overwrite" class="notice" hidden></p>
+    <p id="overwrite" class="notice" role="status" aria-live="polite" hidden></p>
     <p id="save-error" class="error" role="alert" hidden></p>
     <div id="done" class="done" role="status" aria-live="polite"></div>
     <p class="note">週に1回、1つの数字を入れるだけです。同じ週にもう一度記録すると、その週の記録を上書きします。</p>
@@ -200,12 +209,14 @@
 
   <section id="history-section" aria-labelledby="h-history">
     <h2 id="h-history">これまでの記録</h2>
+    <p id="history-hint" class="history-hint" hidden></p>
     <div id="history"></div>
     <button type="button" class="secondary" id="more" hidden>さらに表示</button>
   </section>
 
   <section aria-labelledby="h-backup">
     <h2 id="h-backup">バックアップと保存について</h2>
+    <p id="last-backup" class="last-backup"></p>
     <div class="backup-text">
       <p data-storage-explanation>記録は、この端末のブラウザの中だけに保存されます。ブラウザのデータを消したとき、端末の故障や買い替え、別のブラウザで開いたときは、記録が消えるか、見られなくなります。</p>
       <p data-storage-explanation>バックアップをしなくても、毎週の記録はできます。機種変更や別の端末で見るときのために、月に1回ほどバックアップを保存してください。</p>
@@ -223,7 +234,6 @@
       <button type="button" class="secondary" id="import">バックアップを読み込む</button>
       <input id="import-file" type="file" accept=".json,application/json" hidden>
     </div>
-    <p id="last-backup" class="note"></p>
     <p id="backup-status" class="notice" role="status" aria-live="polite"></p>
     <div id="replace-panel" class="panel" hidden>
       <p id="replace-text"></p>

@@ -74,16 +74,30 @@
     node.hidden = true;
   }
 
+  // The date field is described by the week line, the overwrite notice and the
+  // error, in that order, each only while it is shown (design 8-A).
+  function updateDateDescribedBy() {
+    const ids = C.dateDescribedBy({
+      week: !$("week-notice").hidden,
+      overwrite: !$("overwrite").hidden,
+      error: !$("date-error").hidden,
+    });
+    if (ids) dateInput.setAttribute("aria-describedby", ids);
+    else dateInput.removeAttribute("aria-describedby");
+  }
+
   function setFieldError(input, box, message) {
     show(box, message);
     input.setAttribute("aria-invalid", "true");
-    input.setAttribute("aria-describedby", box.id);
+    if (input === dateInput) updateDateDescribedBy();
+    else input.setAttribute("aria-describedby", box.id);
   }
 
   function clearFieldError(input, box) {
     hide(box);
     input.removeAttribute("aria-invalid");
-    input.removeAttribute("aria-describedby");
+    if (input === dateInput) updateDateDescribedBy();
+    else input.removeAttribute("aria-describedby");
   }
 
   function clearFormMessages() {
@@ -222,10 +236,13 @@
     const rows = C.historyRows(records, t);
     if (!rows.length) {
       target.replaceChildren(el("p", {}, "まだ記録がありません。"));
+      hide($("history-hint"));
       more.hidden = true;
       return;
     }
-    const table = el("table");
+    // How to fix a week, above the table (design 8-C).
+    show($("history-hint"), C.HISTORY_HINT);
+    const table = el("table", { "aria-describedby": "history-hint" });
     const head = el("tr");
     // The unit is in the header, so a number never wraps away from "kg" (design 3-6).
     for (const [name, unit] of [["週", ""], ["体重", "（kg）"], ["前回との差", "（kg）"]]) {
@@ -278,17 +295,30 @@
       renderHistory(t);
     }
     renderLastBackup(t);
+    updateWeekNotice();
+    updateOverwriteNotice();
   }
 
   // ---- recording ----
 
+  // Design 8-A: which week the date belongs to, under the date field.
+  function updateWeekNotice() {
+    const box = $("week-notice");
+    const text = broken || unavailable ? null : C.weekNoticeText(dateInput.value, today());
+    if (text === null) hide(box);
+    else show(box, text);
+    updateDateDescribedBy();
+  }
+
+  // Design 8-B: shown whenever the date's week has a record, except while the
+  // confirmation after recording is shown (that one already says what happened).
   function updateOverwriteNotice() {
     const box = $("overwrite");
-    if (broken || unavailable) return hide(box);
-    const existing = C.findSameWeek(records, dateInput.value);
-    if (!existing) return hide(box);
-    const range = C.formatWeekRange(C.weekOf(existing.date), today());
-    show(box, `この週（${range}）には ${C.formatKg(existing.kg)} の記録があります。記録すると上書きします。`);
+    const done = $("done").childElementCount > 0;
+    const text = broken || unavailable || done ? null : C.overwriteNoticeText(records, dateInput.value, today());
+    if (text === null) hide(box);
+    else show(box, text);
+    updateDateDescribedBy();
   }
 
   $("entry-form").addEventListener("submit", (event) => {
@@ -315,11 +345,10 @@
     records = next;
     kgInput.value = "";
     dateInput.value = t;
-    hide($("overwrite"));
-    render();
 
     const lines = [];
-    if (existing) lines.push(`${C.formatWeekRange(C.weekOf(date), t)}の週の記録を上書きしました。`);
+    // The old value comes from the record that was replaced (design 8-B).
+    if (existing) lines.push(C.overwriteDoneText(date, existing.kg, kg.kg, t));
     const count = C.streak(records, t);
     lines.push(count === null ? "記録しました。" : `記録しました。連続 ${count} 週です。`);
     lines.push(`${C.formatKg(kg.kg)}（${C.formatDate(date, t)}）`);
@@ -328,12 +357,24 @@
     const fixed = C.inputCorrectionText(typed, kg.kg);
     if (fixed) nodes.push(el("p", { class: "fixed" }, fixed));
     $("done").replaceChildren(...nodes);
+    // After the date went back to today: the week line follows it, and the
+    // overwrite notice stays hidden while the confirmation is shown.
+    render();
   });
 
-  for (const input of [kgInput, dateInput]) {
-    input.addEventListener("input", () => $("done").replaceChildren());
+  // The first keystroke clears the confirmation, so the overwrite notice can come
+  // back before Enter is pressed (design 8-B).
+  kgInput.addEventListener("input", () => {
+    $("done").replaceChildren();
+    updateOverwriteNotice();
+  });
+  for (const type of ["input", "change"]) {
+    dateInput.addEventListener(type, () => {
+      if (type === "input") $("done").replaceChildren();
+      updateWeekNotice();
+      updateOverwriteNotice();
+    });
   }
-  dateInput.addEventListener("change", updateOverwriteNotice);
   kgInput.addEventListener("blur", updateOverwriteNotice);
 
   $("more").addEventListener("click", () => {
