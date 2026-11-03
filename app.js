@@ -82,8 +82,19 @@
       overwrite: !$("overwrite").hidden,
       error: !$("date-error").hidden,
     });
-    if (ids) dateInput.setAttribute("aria-describedby", ids);
-    else dateInput.removeAttribute("aria-describedby");
+    if (!ids) dateInput.removeAttribute("aria-describedby");
+    else if (dateInput.getAttribute("aria-describedby") !== ids) dateInput.setAttribute("aria-describedby", ids);
+  }
+
+  // For the lines updated on every keystroke or every day stepped through: the
+  // node is written only when its text really changes, so a live region is read
+  // once and not again for each key (design 8-B).
+  function showOrHide(node, text) {
+    if (text === null) {
+      if (!node.hidden) hide(node);
+    } else if (node.hidden || node.textContent !== text) {
+      show(node, text);
+    }
   }
 
   function setFieldError(input, box, message) {
@@ -305,8 +316,7 @@
   function updateWeekNotice() {
     const box = $("week-notice");
     const text = broken || unavailable ? null : C.weekNoticeText(dateInput.value, today());
-    if (text === null) hide(box);
-    else show(box, text);
+    showOrHide(box, text);
     updateDateDescribedBy();
   }
 
@@ -316,8 +326,7 @@
     const box = $("overwrite");
     const done = $("done").childElementCount > 0;
     const text = broken || unavailable || done ? null : C.overwriteNoticeText(records, dateInput.value, today());
-    if (text === null) hide(box);
-    else show(box, text);
+    showOrHide(box, text);
     updateDateDescribedBy();
   }
 
@@ -371,6 +380,9 @@
   for (const type of ["input", "change"]) {
     dateInput.addEventListener(type, () => {
       if (type === "input") $("done").replaceChildren();
+      // An error from the last try (a future or empty date) is about the date
+      // that was there then; it comes back on the next "記録する" if still wrong.
+      clearFieldError(dateInput, $("date-error"));
       updateWeekNotice();
       updateOverwriteNotice();
     });

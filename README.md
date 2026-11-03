@@ -105,6 +105,7 @@ node --test
 
 - `core.test.js`：週の計算、入力の変換、差、連続週数、グラフ、バックアップの検査など。
 - `source.test.js`：画面に載せない語がないこと、外部送信の手段がないこと、`confirm()` と外部のスクリプトがないこと。
+- `app.test.js`：小さな模擬の画面で `app.js` を動かし、案内の行が同じ文のまま書き直されないこと、日付を変えると日付のエラーが消えることなど。
 
 ### ファイル
 
@@ -115,6 +116,7 @@ node --test
 | `app.js` | 画面の描画と操作 |
 | `core.test.js` | `core.js` の単体テスト |
 | `source.test.js` | 画面に載せない語、外部送信、`confirm()` がないことの確認 |
+| `app.test.js` | 模擬の画面での `app.js` の動きの確認（ライブラリなし） |
 | `.gitignore` | バックアップのファイルを載せない設定 |
 
 ### 不具合や質問
@@ -205,6 +207,7 @@ node --test
 
 - `core.test.js`: week calculation, input parsing, differences, consecutive weeks, chart, backup validation, and more.
 - `source.test.js`: checks that banned wording is absent from the page, that there is no way to send data out, and that `confirm()` and external scripts are not used.
+- `app.test.js`: runs `app.js` on a small fake page and checks, for example, that notice lines are not rewritten with the same text and that changing the date clears the date error.
 
 ### Files
 
@@ -215,6 +218,7 @@ node --test
 | `app.js` | Rendering and interaction |
 | `core.test.js` | Unit tests for `core.js` |
 | `source.test.js` | Checks on page wording and on the absence of external sending and `confirm()` |
+| `app.test.js` | Checks on how `app.js` behaves on a fake page (no library) |
 | `.gitignore` | Keeps backup files out of the repository |
 
 ### Bugs and questions
