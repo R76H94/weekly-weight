@@ -213,11 +213,6 @@
     return fromUtc(toUtc(addWeeks(week, 1)) - DAY_MS);
   }
 
-  // The week column of the history: the range in two parts that are kept whole,
-  // so a line breaks only between them (design 3-6).
-  function weekRangeParts(week, today) {
-    return rangeParts(week, sundayOf(week), today);
-  }
 
   // "11月2日〜8日", "10月26日〜11月1日", "2026年12月28日〜2027年1月3日".
   function formatWeekRange(week, today) {
@@ -614,7 +609,6 @@
     formatDate,
     formatWeekLabel,
     formatWeekLabelWithDay,
-    weekRangeParts,
     formatWeekRange,
     historyRows,
     previousDiffLabel,
