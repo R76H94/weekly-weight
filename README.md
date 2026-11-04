@@ -16,9 +16,7 @@
 
 </div>
 
-> この版は、公開前の確認中です。画面の文言や細部は変わることがあります。<!-- 公開後にこの行を外す -->
-
-<!-- Web版のURLは、公開が承認されたらここに書く -->
+**Web版：** https://r76h94.github.io/weekly-weight/
 
 <!-- 画像は、リポジトリへ画像を追加してから、コメントを外す
 <p align="center">
@@ -138,7 +136,7 @@ node --test
 
 There is no account and no backend. What you type is not sent anywhere. The interface is in Japanese only.
 
-> This version is under pre-release review. Wording and details may change. (Remove this line after release.)
+**Web version:** https://r76h94.github.io/weekly-weight/
 
 ### Features
 
