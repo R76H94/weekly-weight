@@ -377,6 +377,11 @@
     $("done").replaceChildren();
     updateOverwriteNotice();
   });
+  // Like the date: an error from the last try is about the weight that was there
+  // then. No new error while typing; it comes back on the next "記録する" if still wrong.
+  for (const type of ["input", "change"]) {
+    kgInput.addEventListener(type, () => clearFieldError(kgInput, $("kg-error")));
+  }
   for (const type of ["input", "change"]) {
     dateInput.addEventListener(type, () => {
       if (type === "input") $("done").replaceChildren();

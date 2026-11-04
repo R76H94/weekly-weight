@@ -284,3 +284,54 @@ test("changing the date also clears the empty-date error", () => {
   assert.equal(page.$("date-error").hidden, true);
   assert.match(page.$("done").textContent, /記録しました。/);
 });
+
+// ---- 2026-11-04: the weight error goes away when the weight is changed ----
+
+test("changing the weight clears the weight error, without a new error while typing", () => {
+  const page = openPage();
+  page.typeKg("abc");
+  page.submit();
+  assert.equal(page.$("kg-error").hidden, false);
+  assert.equal(page.$("kg-error").textContent, "数字で入れてください。例：62.4");
+  assert.equal(page.$("kg").getAttribute("aria-invalid"), "true");
+  assert.equal(page.$("kg").getAttribute("aria-describedby"), "kg-error");
+
+  // Still not a number after the first key: nothing new is shown while typing.
+  page.$("kg").value = "abc6";
+  page.$("kg").fire("input");
+  assert.equal(page.$("kg-error").hidden, true);
+  assert.equal(page.$("kg-error").textContent, "");
+  assert.equal(page.$("kg").getAttribute("aria-invalid"), null);
+  assert.equal(page.$("kg").getAttribute("aria-describedby"), null);
+  page.typeKg("62.");
+  assert.equal(page.$("kg-error").hidden, true);
+  // The value typed is kept.
+  assert.equal(page.$("kg").value, "62.");
+});
+
+test("a change event alone also clears the weight error", () => {
+  const page = openPage();
+  page.submit();
+  assert.equal(page.$("kg-error").textContent, "体重を入れてください。");
+  page.$("kg").value = "62.5";
+  page.$("kg").fire("change");
+  assert.equal(page.$("kg-error").hidden, true);
+  assert.equal(page.$("kg").getAttribute("aria-invalid"), null);
+});
+
+test("a weight that is still wrong gets its error again on the next 記録する", () => {
+  const page = openPage();
+  page.typeKg("abc");
+  page.submit();
+  page.typeKg("62.45");
+  assert.equal(page.$("kg-error").hidden, true);
+  page.submit();
+  assert.equal(page.$("kg-error").hidden, false);
+  assert.equal(page.$("kg-error").textContent, "小数は第1位までで入れてください。例：62.4");
+  assert.equal(page.$("kg").getAttribute("aria-invalid"), "true");
+  assert.equal(page.$("kg").getAttribute("aria-describedby"), "kg-error");
+  page.typeKg("62.4");
+  page.submit();
+  assert.equal(page.$("kg-error").hidden, true);
+  assert.match(page.$("done").textContent, /記録しました。/);
+});
