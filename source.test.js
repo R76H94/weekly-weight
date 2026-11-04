@@ -198,6 +198,8 @@ function newTexts() {
     core.overwriteNoticeText(records, "2026-11-08", "2026-11-09"),
     core.overwriteDoneText("2026-11-04", 62.9, 62.7, "2026-11-09"),
     core.overwriteDoneText("2027-01-02", 63.1, 63.1, "2027-01-05"),
+    core.overwriteNoticeText([{ date: "2026-12-29", kg: 63.0 }], "2027-01-03", "2027-01-05"),
+    core.weekNoticeText("2028-02-29", "2028-03-01"),
     core.HISTORY_HINT,
   ];
 }
@@ -207,7 +209,8 @@ test("the new texts have no banned words, no judging words and no promise of rem
     assert.equal(typeof text, "string");
     for (const word of BANNED_WORDS) assert.ok(!text.includes(word), `${text} contains ${word}`);
     // 8-B: facts only. 8-C: nothing can be removed or undone.
-    for (const word of ["更新しました", "変わりました", "消せます", "削除", "取り消し", "編集", "修正"]) {
+    // 2026-11-04: "上書き" became "置き換え"; no words of going up or down either.
+    for (const word of ["更新しました", "変わりました", "消せます", "削除", "取り消し", "編集", "修正", "上書き", "増", "減"]) {
       assert.ok(!text.includes(word), `${text} contains ${word}`);
     }
   }
@@ -263,4 +266,18 @@ test("the last backup line is right under the backup heading, once, in body text
   assert.match(html, /<h2 id="h-backup">バックアップと保存について<\/h2>\s*<p id="last-backup" class="last-backup"><\/p>\s*<div class="backup-text">/);
   assert.equal(html.match(/id="last-backup"/g).length, 1);
   assert.ok(!/\.last-backup \{[^}]*(font-size|font-weight|color)/.test(html), "same size and colour as the body");
+});
+
+// ---- 2026-11-04: "上書き" is not used on the screen any more ----
+
+test("the screen says 置き換え, never 上書き", () => {
+  for (const [name, text] of Object.entries(sources)) {
+    assert.ok(!text.includes("上書き"), `${name} contains 上書き`);
+  }
+  const notice = core.overwriteNoticeText([{ date: "2026-11-03", kg: 62.7 }], "2026-11-04", "2026-11-09");
+  // Only this week's record is replaced, and the other weeks stay; the sentence is about "この週の記録".
+  assert.ok(notice.includes("この週の記録だけが新しい体重に置き換わります。"));
+  assert.ok(notice.includes("ほかの週の記録はそのまま残ります。"));
+  assert.ok(core.overwriteDoneText("2026-11-04", 62.9, 62.7, "2026-11-09").endsWith("に置き換えました。"));
+  assert.ok(sources["index.html"].includes("同じ週にもう一度記録すると、その週の記録を置き換えます。"));
 });

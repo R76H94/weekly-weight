@@ -643,22 +643,35 @@ test("last backup line: hidden and the key not read only when storage is unavail
 
 // ---- design 8 (2026-11-03): the week line, the overwrite texts, the history hint ----
 
-test("week line under the date: the Monday of the date's week, with （月）", () => {
+test("week line under the date: Monday to Sunday of the date's week, with （月） and （日）", () => {
   const t = "2026-11-09";
-  assert.equal(core.weekNoticeText("2026-11-02", t), "この日付は11月2日（月）から始まる週の記録になります。"); // Monday
-  assert.equal(core.weekNoticeText("2026-11-04", t), "この日付は11月2日（月）から始まる週の記録になります。"); // Wednesday
-  assert.equal(core.weekNoticeText("2026-11-08", t), "この日付は11月2日（月）から始まる週の記録になります。"); // Sunday
-  assert.equal(core.weekNoticeText("2026-11-09", t), "この日付は11月9日（月）から始まる週の記録になります。"); // today
-  assert.equal(core.weekNoticeText("2026-11-01", t), "この日付は10月26日（月）から始まる週の記録になります。"); // across months
-  assert.equal(core.weekNoticeText("2028-03-01", "2028-03-01"), "この日付は2月28日（月）から始まる週の記録になります。"); // leap year
+  assert.equal(core.weekNoticeText("2026-11-02", t), "この日付は11月2日（月）〜8日（日）の週の記録になります。"); // Monday
+  assert.equal(core.weekNoticeText("2026-11-04", t), "この日付は11月2日（月）〜8日（日）の週の記録になります。"); // Wednesday
+  assert.equal(core.weekNoticeText("2026-11-08", t), "この日付は11月2日（月）〜8日（日）の週の記録になります。"); // Sunday
+  assert.equal(core.weekNoticeText("2026-11-09", t), "この日付は11月9日（月）〜15日（日）の週の記録になります。"); // today
+  // Across months: the Sunday gets its month.
+  assert.equal(core.weekNoticeText("2026-11-01", t), "この日付は10月26日（月）〜11月1日（日）の週の記録になります。");
+  assert.equal(core.weekNoticeText("2026-10-28", t), "この日付は10月26日（月）〜11月1日（日）の週の記録になります。");
+  // Leap years: 2月29日 is inside the week, and the week after it starts in March.
+  assert.equal(core.weekNoticeText("2028-02-29", "2028-03-01"), "この日付は2月28日（月）〜3月5日（日）の週の記録になります。");
+  assert.equal(core.weekNoticeText("2028-03-01", "2028-03-01"), "この日付は2月28日（月）〜3月5日（日）の週の記録になります。");
+  assert.equal(core.weekNoticeText("2024-03-03", "2024-03-04"), "この日付は2月26日（月）〜3月3日（日）の週の記録になります。");
+  // Not a leap year: 2月28日 is followed by 3月1日.
+  assert.equal(core.weekNoticeText("2027-03-01", "2027-03-02"), "この日付は3月1日（月）〜7日（日）の週の記録になります。");
+  assert.equal(core.weekNoticeText("2027-02-28", "2027-03-02"), "この日付は2月22日（月）〜28日（日）の週の記録になります。");
 });
 
-test("week line: the year is written when the Monday is not in this year", () => {
-  // The Monday's year decides, even when the date itself is in this year.
-  assert.equal(core.weekNoticeText("2027-01-03", "2027-01-05"), "この日付は2026年12月28日（月）から始まる週の記録になります。");
-  assert.equal(core.weekNoticeText("2026-12-31", "2027-01-05"), "この日付は2026年12月28日（月）から始まる週の記録になります。");
-  assert.equal(core.weekNoticeText("2026-12-31", "2026-12-31"), "この日付は12月28日（月）から始まる週の記録になります。");
-  assert.equal(core.weekNoticeText("2027-01-04", "2027-01-05"), "この日付は1月4日（月）から始まる週の記録になります。");
+test("week line: the year follows the design's year rule for ranges", () => {
+  // The Monday's year decides, even when the date itself is in this year; the Sunday
+  // gets a year only when the Monday has one and the years differ.
+  assert.equal(core.weekNoticeText("2027-01-03", "2027-01-05"), "この日付は2026年12月28日（月）〜2027年1月3日（日）の週の記録になります。");
+  assert.equal(core.weekNoticeText("2026-12-31", "2027-01-05"), "この日付は2026年12月28日（月）〜2027年1月3日（日）の週の記録になります。");
+  // Seen in the Monday's year: no year at all, the Sunday gets its month.
+  assert.equal(core.weekNoticeText("2026-12-31", "2026-12-31"), "この日付は12月28日（月）〜1月3日（日）の週の記録になります。");
+  assert.equal(core.weekNoticeText("2027-01-04", "2027-01-05"), "この日付は1月4日（月）〜10日（日）の週の記録になります。");
+  // A past year inside one year: the year is written once, on the Monday.
+  assert.equal(core.weekNoticeText("2025-11-05", "2026-11-09"), "この日付は2025年11月3日（月）〜9日（日）の週の記録になります。");
+  assert.equal(core.weekNoticeText("2025-12-03", "2026-11-09"), "この日付は2025年12月1日（月）〜7日（日）の週の記録になります。");
 });
 
 test("week line: no line for an empty, unreal or future date", () => {
@@ -677,7 +690,7 @@ test("week line: the same in every time zone", () => {
     const out = execFileSync(process.execPath, ["-e", script], { env: { ...process.env, TZ: tz }, encoding: "utf8" });
     assert.deepEqual(
       JSON.parse(out),
-      ["この日付は11月2日（月）から始まる週の記録になります。", "この日付は2026年12月28日（月）から始まる週の記録になります。"],
+      ["この日付は11月2日（月）〜8日（日）の週の記録になります。", "この日付は2026年12月28日（月）〜2027年1月3日（日）の週の記録になります。"],
       tz,
     );
   }
@@ -687,14 +700,14 @@ test("overwrite notice before recording: the existing record of the date's week,
   const records = [r("2026-10-26", 62.9), r("2026-11-03", 62.7)];
   assert.equal(
     core.overwriteNoticeText(records, "2026-11-08", "2026-11-09"),
-    "この週（11月2日〜8日）には 62.7 kg の記録があります。記録すると上書きします。",
+    "この週（11月2日〜8日）には 62.7 kg の記録があります。記録すると、この週の記録だけが新しい体重に置き換わります。ほかの週の記録はそのまま残ります。",
   );
   assert.equal(core.overwriteNoticeText(records, "2026-11-09", "2026-11-09"), null);
   assert.equal(core.overwriteNoticeText(records, "", "2026-11-09"), null);
   assert.equal(core.overwriteNoticeText([], "2026-11-08", "2026-11-09"), null);
   assert.equal(
     core.overwriteNoticeText([r("2026-12-29", 63.0)], "2027-01-03", "2027-01-05"),
-    "この週（2026年12月28日〜2027年1月3日）には 63.0 kg の記録があります。記録すると上書きします。",
+    "この週（2026年12月28日〜2027年1月3日）には 63.0 kg の記録があります。記録すると、この週の記録だけが新しい体重に置き換わります。ほかの週の記録はそのまま残ります。",
   );
 });
 
@@ -708,26 +721,26 @@ test("overwrite line after recording: the old and the new value, the old one tak
   assert.deepEqual(core.findSameWeek(next, "2026-11-05"), r("2026-11-05", 62.7));
   assert.equal(
     core.overwriteDoneText("2026-11-05", existing.kg, typed.kg, "2026-11-09"),
-    "11月2日〜8日の週の記録を 62.9 kg から 62.7 kg に上書きしました。",
+    "11月2日〜8日の週の記録を 62.9 kg から 62.7 kg に置き換えました。",
   );
 });
 
 test("overwrite line after recording: same values, whole numbers and a year-crossing week", () => {
   assert.equal(
     core.overwriteDoneText("2026-11-02", 62.7, 62.7, "2026-11-09"),
-    "11月2日〜8日の週の記録を 62.7 kg から 62.7 kg に上書きしました。",
+    "11月2日〜8日の週の記録を 62.7 kg から 62.7 kg に置き換えました。",
   );
   assert.equal(
     core.overwriteDoneText("2026-11-02", 63, 64, "2026-11-09"),
-    "11月2日〜8日の週の記録を 63.0 kg から 64.0 kg に上書きしました。",
+    "11月2日〜8日の週の記録を 63.0 kg から 64.0 kg に置き換えました。",
   );
   assert.equal(
     core.overwriteDoneText("2027-01-02", 63.1, 63.0, "2027-01-05"),
-    "2026年12月28日〜2027年1月3日の週の記録を 63.1 kg から 63.0 kg に上書きしました。",
+    "2026年12月28日〜2027年1月3日の週の記録を 63.1 kg から 63.0 kg に置き換えました。",
   );
   assert.equal(
     core.overwriteDoneText("2026-10-30", 62.9, 62.8, "2026-11-09"),
-    "10月26日〜11月1日の週の記録を 62.9 kg から 62.8 kg に上書きしました。",
+    "10月26日〜11月1日の週の記録を 62.9 kg から 62.8 kg に置き換えました。",
   );
 });
 

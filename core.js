@@ -192,21 +192,36 @@
     return `${formatWeekStart(week, today)}（月）から始まる週`;
   }
 
-  // From a Monday to a Sunday. The year follows the Monday; the Sunday gets a year
-  // only when the Monday has one and the years differ.
-  function formatRange(monday, sunday, today) {
+  // From a Monday to a Sunday, as two parts: "11月2日〜" and "8日". The year follows
+  // the Monday; the Sunday gets a year only when the Monday has one and the years differ.
+  // With days, "（月）" and "（日）" follow the two dates (the week line, design 8-A).
+  function rangeParts(monday, sunday, today, withDays = false) {
     const start = formatWeekStart(monday, today);
     const withYear = yearOf(monday) !== yearOf(today);
     let endText;
     if (withYear && yearOf(sunday) !== yearOf(monday)) endText = `${yearOf(sunday)}年${monthDay(sunday)}`;
     else if (sunday.slice(0, 7) !== monday.slice(0, 7)) endText = monthDay(sunday);
     else endText = `${Number(sunday.slice(8, 10))}日`;
-    return `${start}〜${endText}`;
+    return withDays ? [`${start}（月）〜`, `${endText}（日）`] : [`${start}〜`, endText];
+  }
+
+  function formatRange(monday, sunday, today) {
+    return rangeParts(monday, sunday, today).join("");
+  }
+
+  function sundayOf(week) {
+    return fromUtc(toUtc(addWeeks(week, 1)) - DAY_MS);
+  }
+
+  // The week column of the history: the range in two parts that are kept whole,
+  // so a line breaks only between them (design 3-6).
+  function weekRangeParts(week, today) {
+    return rangeParts(week, sundayOf(week), today);
   }
 
   // "11月2日〜8日", "10月26日〜11月1日", "2026年12月28日〜2027年1月3日".
   function formatWeekRange(week, today) {
-    return formatRange(week, fromUtc(toUtc(addWeeks(week, 1)) - DAY_MS), today);
+    return formatRange(week, sundayOf(week), today);
   }
 
   function nextRecordText(records, today) {
@@ -218,24 +233,27 @@
 
   // ---- texts around the form (design 8, A and B) ----
 
-  // The line under the date field: which week the date belongs to. null when the
-  // date is empty, not a real day, or after today (no line; the error says why on submit).
+  // The line under the date field: which week the date belongs to, Monday to Sunday,
+  // "11月2日（月）〜8日（日）の週". null when the date is empty, not a real day, or
+  // after today (no line; the error says why on submit).
   function weekNoticeText(date, today) {
     if (!isRealDate(date) || !isRealDate(today) || date > today) return null;
-    return `この日付は${formatWeekLabelWithDay(weekOf(date), today)}の記録になります。`;
+    const week = weekOf(date);
+    return `この日付は${rangeParts(week, sundayOf(week), today, true).join("")}の週の記録になります。`;
   }
 
-  // Before recording: the week of the date already has a record. null when it has not.
+  // Before recording: the week of the date already has a record. Says that only this
+  // week's record is replaced and the other weeks stay. null when it has not.
   function overwriteNoticeText(records, date, today) {
     const existing = findSameWeek(records, date);
     if (!existing) return null;
-    return `この週（${formatWeekRange(weekOf(existing.date), today)}）には ${formatKg(existing.kg)} の記録があります。記録すると上書きします。`;
+    return `この週（${formatWeekRange(weekOf(existing.date), today)}）には ${formatKg(existing.kg)} の記録があります。記録すると、この週の記録だけが新しい体重に置き換わります。ほかの週の記録はそのまま残ります。`;
   }
 
   // After recording over a week: the old and the new value, as a fact only.
   // The same sentence is used when both values are equal.
   function overwriteDoneText(date, oldKg, newKg, today) {
-    return `${formatWeekRange(weekOf(date), today)}の週の記録を ${formatKg(oldKg)} から ${formatKg(newKg)} に上書きしました。`;
+    return `${formatWeekRange(weekOf(date), today)}の週の記録を ${formatKg(oldKg)} から ${formatKg(newKg)} に置き換えました。`;
   }
 
   // Above the history table. Says how to fix a week; nothing can be removed.
@@ -596,6 +614,7 @@
     formatDate,
     formatWeekLabel,
     formatWeekLabelWithDay,
+    weekRangeParts,
     formatWeekRange,
     historyRows,
     previousDiffLabel,

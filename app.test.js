@@ -201,7 +201,7 @@ test("the overwrite notice still comes back after recording, at the first key", 
   page.typeKg("62.5");
   page.submit();
   assert.equal(page.$("overwrite").hidden, true);
-  assert.match(page.$("done").textContent, /62\.7 kg から 62\.5 kg に上書きしました。/);
+  assert.match(page.$("done").textContent, /62\.7 kg から 62\.5 kg に置き換えました。/);
   page.typeKg("6");
   assert.equal(page.$("done").childElementCount, 0);
   assert.equal(page.$("overwrite").hidden, false);
@@ -217,7 +217,7 @@ test("the week line is not rewritten when the date moves within the same week", 
   assert.equal(box.textWrites, writes);
   page.setDate("2026-10-30");
   assert.equal(box.textWrites, writes + 1);
-  assert.equal(box.textContent, "この日付は10月26日（月）から始まる週の記録になります。");
+  assert.equal(box.textContent, "この日付は10月26日（月）〜11月1日（日）の週の記録になります。");
 });
 
 test("the date's aria-describedby is not set again with the same value", () => {
@@ -250,7 +250,7 @@ test("changing the date clears the future-date error, and the week line stands a
   assert.equal(page.$("date-error").textContent, "");
   assert.equal(page.$("date").getAttribute("aria-invalid"), null);
   assert.equal(page.$("week-notice").hidden, false);
-  assert.equal(page.$("week-notice").textContent, "この日付は10月26日（月）から始まる週の記録になります。");
+  assert.equal(page.$("week-notice").textContent, "この日付は10月26日（月）〜11月1日（日）の週の記録になります。");
   assert.equal(page.$("date").getAttribute("aria-describedby"), "week-notice");
   // The weight typed before is kept.
   assert.equal(page.$("kg").value, "62.0");
