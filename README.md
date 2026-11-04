@@ -35,7 +35,7 @@
 
 毎日の記録が続かなかった人が、体重だけを週に1回、1つの数字として残すためのページです。体重を入れて「記録する」を押すと、前回との差、開始からの差、連続して記録した週の数、推移のグラフが表示されます。
 
-アカウントの登録はありません。サーバーもありません。入力した内容は、外部へ送信しません。
+アカウントの登録はありません。サーバー側の処理はありません。入力した内容は、外部へ送信しません。
 
 ### 機能
 
@@ -69,6 +69,7 @@
 
 - 記録は、**この端末のブラウザの中だけ**に保存されます（`localStorage`。キー `weekly-weight-v1` に記録の日付と体重、キー `weekly-weight-last-backup` に最後にバックアップを作った日）。保存するのはこれだけです。
 - 外部へは送信しません（アクセス解析も入れていません）。
+- 公開ページ（GitHub Pages）を開くと、GitHub が安全のために訪問者の IP アドレスを記録します。入力した体重や日付は含まれません。
 - **記録は消えることがあります。** ブラウザのデータを消したとき、端末の故障や買い替え、別のブラウザで開いたときは、記録が消えるか、見られなくなります。
 - そのため、**月に1回ほどバックアップを保存してください**（画面の「バックアップを保存」）。バックアップをしなくても、毎週の記録はできます。
 - 別の端末へ移すときは、今の端末でバックアップを保存し、できたファイルを新しい端末へ渡して、「バックアップを読み込む」を押します。読み込みは、いまの記録をファイルの内容に置き換えます（合成はしません）。
@@ -135,13 +136,13 @@ node --test
 
 **Weekly Weight** is a single browser page for logging your weight once a week, as one number. After you enter a value, it shows the difference from the previous record, the difference from the first record, the number of consecutive weeks you logged, and a trend chart.
 
-There is no account and no server. What you type is not sent anywhere. The interface is in Japanese only.
+There is no account and no backend. What you type is not sent anywhere. The interface is in Japanese only.
 
 > This version is under pre-release review. Wording and details may change. (Remove this line after release.)
 
 ### Features
 
-- **One record per week.** A week runs from Monday to Sunday. Logging again in the same week overwrites that week's record, and the page tells you before it does.
+- **One record per week.** A week runs from Monday to Sunday. Logging again in the same week replaces that week's record, and the page tells you before it does.
 - **Four numbers.** Latest weight, difference from the previous record, difference from the first record, consecutive weeks. Differences are shown only as signed numbers, with no colors or arrows.
 - **Trend chart.** A hand-written SVG with no chart library. Shows up to the latest 52 weeks.
 - **History.** Newest week first. Weeks without a record are shown as a single line. Twelve rows at a time.
@@ -171,6 +172,7 @@ Differences are computed from all records each time the page is drawn. They are 
 
 - Records are stored **only in this device's browser** (`localStorage`: key `weekly-weight-v1` holds the dates and weights, key `weekly-weight-last-backup` holds the date of your last backup). Nothing else is stored.
 - What you enter is not sent to the outside. No analytics are included.
+- When you open the public page (GitHub Pages), GitHub logs visitors' IP addresses for security purposes. The weights and dates you enter are not included.
 - **Records can disappear.** If you clear browser data, the device breaks or is replaced, or you open the page in a different browser, the records may be lost or invisible.
 - **Save a backup about once a month** with the "Save backup" button. You can log every week without making backups.
 - To move to another device, save a backup on the current one, bring the file to the new one, and load it there. Loading replaces the current records with the file's content. It does not merge.
