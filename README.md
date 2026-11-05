@@ -18,12 +18,12 @@
 
 **Web版：** https://r76h94.github.io/weekly-weight/
 
-<!-- 画像は、リポジトリへ画像を追加してから、コメントを外す
 <p align="center">
-  <img src="docs/images/desktop.png" alt="週イチ体重の画面（パソコンの幅）" width="520">
-  <img src="docs/images/mobile.png" alt="週イチ体重の画面（スマートフォンの幅）" width="220">
+  <img src="docs/screenshots/01-first-open-top.png" alt="週イチ体重の画面：初めて開いたとき / First open" width="240">
+  <img src="docs/screenshots/02-recorded-top.png" alt="週イチ体重の画面：記録したあと / After recording" width="240">
+  <img src="docs/screenshots/03-dark-top.png" alt="週イチ体重の画面：ダークモード / Dark mode" width="240">
 </p>
--->
+<p align="center"><sub>画面の上部（架空のデータ、幅390px） / Top of the page (made-up data, 390px wide)</sub></p>
 
 ---
 
